@@ -119,20 +119,20 @@ class SpritzCipher {
   }
 
   private def update() = {
-     i = (i + w) % 256
+     i = (i + w) & 0xff 
      val si = s(i) & 0xff
-     val sjsi = s( (j + si) % 256 ) & 0xff
-     j = ( k + sjsi ) % 256
+     val sjsi = s( (j + si) & 0xff ) & 0xff
+     j = ( k + sjsi ) & 0xff 
      val sj = s(j) & 0xff
-     k = ( i + k + sj ) % 256
+     k = ( i + k + sj ) & 0xff 
      swap(i,j)
   }
 
   private def dripOne(): Int = {
      update()
-     val step1 = s( (z + k) % 256 ) & 0xff
-     val step2 = s( (i + step1) % 256 ) & 0xff
-     z =  s( (j + step2) % 256 ) & 0xff
+     val step1 = s( (z + k) & 0xff ) & 0xff
+     val step2 = s( (i + step1) & 0xff ) & 0xff
+     z =  s( (j + step2) & 0xff ) & 0xff
      z
   }
 
