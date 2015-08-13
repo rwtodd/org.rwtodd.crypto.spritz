@@ -14,6 +14,8 @@
 //   You should have received a copy of the GNU General Public License
 //   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+package com.waywardcode.crypto
+
 
 /** Implements the Spritz stream cipher. 
   * This class does the actual calculation, and
@@ -26,14 +28,18 @@ class SpritzCipher {
   private var w = 1           // but match the RS14.pdf description
   private val s = Array.tabulate(256) { _.toByte }
 
-  /** Abosrb a single byte. */
+  /** Abosrb a single byte. 
+    * @param b the byte to absorb.
+    */
   def absorb(b: Byte): Unit =  {
      absorbNibble( b & 0x0F )        // low bits
      absorbNibble( (b & 0xFF) >> 4 ) // high bits
   }
 
-  /** Abosrb a sequence of bytes. */
-  def absorb(i: Seq[Byte]): Unit = i foreach absorb 
+  /** Abosrb a sequence of bytes. 
+    * @param bs the bytes to absorb.
+    */
+  def absorb(bs: Seq[Byte]): Unit = bs foreach absorb 
 
   private def swap(e1: Int, e2: Int) = {
      val tmp = s(e1) ; s(e1) = s(e2) ; s(e2) = tmp
@@ -42,7 +48,7 @@ class SpritzCipher {
   private def absorbNibble(x: Int) = {
     if (a == 128) { shuffle() }
     swap(a, 128 + x)  // no need for mod here due to nibble size
-    a = a + 1
+    a += 1
   }
 
   /** Inserts a separator between absorbed sources. 
@@ -51,7 +57,7 @@ class SpritzCipher {
     */ 
   def absorbStop() = {
     if (a == 128) { shuffle() }
-    a = a + 1
+    a += 1
   } 
 
   private def shuffle() = {
@@ -63,14 +69,15 @@ class SpritzCipher {
      a = 0
   }
 
-  private def GCD(e1: Int, e2: Int): Int = {
-    if (e2 == 0) e1 else GCD(e2, e1 % e2)
-  }
-
   private def whip(r: Int) = {
-    for(v <- 0 until r) { update() }
-    w = (w + 1) & 0xff
-    while(GCD(w,256) != 1) { w = (w + 1) & 0xff } 
+    def GCD(e1: Int, e2: Int): Int = {
+       if (e2 == 0) e1 else GCD(e2, e1 % e2)
+    }
+
+    (1 to r) foreach { _ => update() }
+    do { 
+      w = (w + 1) & 0xff
+    } while(GCD(w,256) != 1)
   } 
 
   private def crush() = {
@@ -80,38 +87,42 @@ class SpritzCipher {
      }
   }
 
-  /** Fill buf with random bytes. This should only
+  /** Fill buf with cipher bytes. This should only
     * be called after one or more calls to absorb. 
+    * @param buf the array to overwrite with the cipher stream.
+    * @return the transformed array
     */
   def squeeze(buf: Array[Byte]): Array[Byte] = {
     if (a > 0) { shuffle() }
-    for(idx <- 0 until buf.length) {
-      buf(idx) = dripOne().toByte
-    } 
+    buf transform { _ => dripOne().toByte }
     buf
   }
 
-  /** Create an array of r random bytes. This should only
+  /** Create an array of cipher bytes. This should only
     * be called after one or more calls to absorb. 
+    * @param count the number of bytes to squeeze 
+    * @return a newly-created array of bytes from the cipher
     */
-  def squeeze(r: Int): Array[Byte] = {
-    squeeze( new Array[Byte](r) )
+  def squeeze(count: Int): Array[Byte] = {
+    squeeze( new Array[Byte](count) )
   } 
   
   /** Like squeeze, but XORs into the existing buffer.
     * Obviously this is here to encrypt or decrypt 
     * arrays of data.
+    * @param buf a buffer of data to encrypt/decrypt 
+    *   against the cipher stream.
+    * @return the transformed array
     */
   def squeezeXOR(buf: Array[Byte]): Array[Byte] = {
     if (a > 0) { shuffle() }
-    for(idx <- 0 until buf.length) {
-      buf(idx) = (buf(idx) ^ dripOne()).toByte
-    } 
+    buf transform { item => (item ^ dripOne()).toByte }
     buf
   }
 
   /** Generate a single random byte. Only to be
     * used after one or more calls to absorb.
+    * @return the next byte from the cipher stream
     */
   def drip() = {
     if (a > 0) { shuffle() }
@@ -148,13 +159,30 @@ object SpritzCipher {
      encStream
   }
 
-  def hash(bits: Int, data: Seq[Byte]):Array[Byte] = {
+  def hash(bits: Int, data: Seq[Byte]): Array[Byte] = {
      val bytes = (bits + 7)/8
-     val pwhash = new SpritzCipher
-     pwhash.absorb(data)
-     pwhash.absorbStop()
-     pwhash.absorb( bytes.toByte )
-     pwhash.squeeze(bytes) 
+     val hasher = new SpritzCipher
+     hasher.absorb(data)
+     hasher.absorbStop()
+     hasher.absorb( bytes.toByte )
+     hasher.squeeze(bytes) 
+  }
+
+  def hash(bits: Int, instr: java.io.InputStream): Array[Byte] = {
+     val hasher = new SpritzCipher
+     val bytes = (bits + 7)/8
+     val buffer = new Array[Byte](1024)
+
+     var count = instr.read(buffer) 
+     while(count >= 0) {
+        for( idx <- 0 until count) {
+            hasher.absorb( buffer(idx) )
+        }
+        count = instr.read(buffer)
+     }
+     hasher.absorbStop()
+     hasher.absorb( bytes.toByte )
+     hasher.squeeze(bytes)
   }
 }
 
