@@ -22,6 +22,7 @@ package com.waywardcode.crypto
   * encapsulates the internal spritz state. 
   * A companion object is provided with
   * helper functions for use in common cases.
+  * @author Richard Todd
   */
 class SpritzCipher {
   private var i,j,k,z,a = 0   // these are terrible names,
@@ -114,7 +115,7 @@ class SpritzCipher {
     *   against the cipher stream.
     * @return the transformed array
     */
-  def squeezeXOR(buf: Array[Byte]): Array[Byte] = {
+  def squeezeXOR(buf: scala.collection.mutable.Seq[Byte]) = {
     if (a > 0) { shuffle() }
     buf transform { item => (item ^ dripOne()).toByte }
     buf
@@ -149,14 +150,79 @@ class SpritzCipher {
 
 }
 
-// The companion object helps use the cipher
-// in common scenarios.
+/** Convenience functions for common uses of SpritzCipher.
+  * @author Richard Todd
+  */
 object SpritzCipher {
-  def cipherStream(key: String): SpritzCipher = {
+  def cipherStream(key: String, iv: Seq[Byte] = Nil): SpritzCipher = {
      val pwhash = hash(256, key.getBytes("UTF-8")) 
      val encStream = new SpritzCipher
      encStream.absorb(pwhash)
+     if(!iv.isEmpty) {
+        encStream.absorbStop()
+        encStream.absorb(iv)
+     }
      encStream
+  }
+
+  def combine(cipher: SpritzCipher,
+              instr: java.io.InputStream,
+              outstr: java.io.OutputStream): Unit = {
+     val buffer = new Array[Byte](4096)
+
+     var count = instr.read(buffer) 
+     while(count >= 0) {
+        cipher.squeezeXOR(buffer.view(0,count))
+        outstr.write(buffer,0,count)
+        count = instr.read(buffer)
+     }
+  }
+
+  def encrypt(key: String, 
+              instr: java.io.InputStream, 
+              outstr: java.io.OutputStream): Unit = {
+
+     val rnd = new scala.util.Random(System.currentTimeMillis)
+     val iv = new Array[Byte](4)
+     rnd.nextBytes(iv)
+
+     val cipher = cipherStream(key, iv)
+
+     // first, write the iv..
+     outstr.write(iv)
+     combine(cipher, instr, outstr)     
+
+  }
+
+  private def readFully(instr: java.io.InputStream,
+                        buffer: Array[Byte]): Int = {
+
+      var total = buffer.length
+      var offset = 0
+
+      while( total > 0 ) {
+         val amount = instr.read(buffer, offset, total)
+         if (amount >= 0) {
+           offset += amount
+           total -= amount
+         } else {
+            total = 0
+         }
+      } 
+      offset
+  }
+
+  def decrypt(key: String, 
+              instr: java.io.InputStream, 
+              outstr: java.io.OutputStream): Unit = {
+     
+     val iv = new Array[Byte](4)
+     if( readFully(instr, iv) != 4 ) {
+         throw new IllegalArgumentException("Instream wasn't even long enough to contain an IV!")
+     }
+
+     val cipher = cipherStream(key, iv)
+     combine(cipher, instr, outstr)     
   }
 
   def hash(bits: Int, data: Seq[Byte]): Array[Byte] = {
@@ -171,15 +237,14 @@ object SpritzCipher {
   def hash(bits: Int, instr: java.io.InputStream): Array[Byte] = {
      val hasher = new SpritzCipher
      val bytes = (bits + 7)/8
-     val buffer = new Array[Byte](1024)
+     val buffer = new Array[Byte](4096)
 
      var count = instr.read(buffer) 
      while(count >= 0) {
-        for( idx <- 0 until count) {
-            hasher.absorb( buffer(idx) )
-        }
+        hasher.absorb(buffer.view(0,count))
         count = instr.read(buffer)
      }
+
      hasher.absorbStop()
      hasher.absorb( bytes.toByte )
      hasher.squeeze(bytes)
