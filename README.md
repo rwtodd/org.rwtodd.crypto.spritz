@@ -19,7 +19,7 @@ val  hash = SpritzCipher.hash(256, inbytes)
 SpritzCipher.encrypt(password, instream, outstream)
 
 // decrypt a stream
-SpritzCipher.encrypt(password, instream, outstream)
+SpritzCipher.decrypt(password, instream, outstream)
 ```
 
 I've got spritz_hash.scala and spritz_crypt.scala, which
