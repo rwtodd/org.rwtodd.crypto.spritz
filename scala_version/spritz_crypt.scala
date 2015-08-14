@@ -48,6 +48,7 @@ object Crypt {
 
   def main(args: Array[String]): Unit = {
      val pw = args(0)
+     println(s"Password is: <$pw>")
      args.iterator.drop(1) foreach { doOne(pw,_) }
 
   }

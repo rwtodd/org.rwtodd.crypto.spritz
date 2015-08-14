@@ -1,19 +1,28 @@
 # spritz_cipher
-A scala implementation of the Spritz sponge-like stream cipher.
+A java implementation of the Spritz sponge-like stream cipher.
 
 I read about this fun cipher [here (RS14.pdf)][1], and
-decided to implement it in scala.  It has all the 
+decided to implement it in scala.  After that, I converted it
+to java to compare the two.  Here's what I found:
+
+  * The java source and scala source were roughly the same size
+  * `javac` produced 1 class file (4kb), while `scalac` produced
+     11 class files (24kb).
+
+I think I'll stick with the java version!
+
+The class has all the 
 methods int he PDF spec, and exposes the ones like
 `absorb` and `squeeze` that are used to encrypt, decrypt,
 and hash.
 
-The provided companion object SpritzCipher is intended to
+The provided static methods are intended to
 cover the simple cases. It can compute hashes, and encrypt
 or decrypt a stream.
 
 ```
 // get a 256-bit hash of some bytes
-val  hash = SpritzCipher.hash(256, inbytes)
+byte[]  hash = SpritzCipher.hash(256, inbytes)
 
 // encrypt a stream 
 SpritzCipher.encrypt(password, instream, outstream)
@@ -22,9 +31,8 @@ SpritzCipher.encrypt(password, instream, outstream)
 SpritzCipher.decrypt(password, instream, outstream)
 ```
 
-I've got spritz_hash.scala and spritz_crypt.scala, which
-have objects for use from the command line. Right now,
-they are _too_ basic, but they are good enough for testing.
+I had scala command-line programs for hashing and encrypting. I
+still need to reimplement those in java. 
 
 ```
 > scala rwt.spritz.Hash *.scala
