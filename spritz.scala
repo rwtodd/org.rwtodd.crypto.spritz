@@ -190,6 +190,19 @@ object SpritzCipher {
 
      // first, write the iv..
      outstr.write(iv)
+
+     // now, write 4 random bytes, and a hash of them...
+     // so we can tell if we have the right password
+     // on decryption
+     val randomBytes = new Array[Byte](4)
+     rnd.nextBytes(randomBytes)
+     val hashedBytes = hash(32,randomBytes)
+     cipher.squeezeXOR(randomBytes)
+     cipher.squeezeXOR(hashedBytes)
+     outstr.write(randomBytes)
+     outstr.write(hashedBytes)
+
+     // now just write the encrypted stream...
      combine(cipher, instr, outstr)     
 
   }
@@ -222,6 +235,25 @@ object SpritzCipher {
      }
 
      val cipher = cipherStream(key, iv)
+
+     // now verify the random bytes and their hash...
+     val randomBytes = new Array[Byte](4)
+     if( readFully(instr, randomBytes) != 4 ) {
+         throw new IllegalArgumentException("Instream wasn't even long enough for a header!")
+     }
+     val randomHash = new Array[Byte](4)
+     if( readFully(instr, randomHash) != 4 ) {
+         throw new IllegalArgumentException("Instream wasn't even long enough for a header!")
+     }
+     cipher.squeezeXOR(randomBytes) 
+     cipher.squeezeXOR(randomHash) 
+     val testHash = hash(32,randomBytes)
+     if( !(testHash sameElements randomHash) ) {
+         throw new IllegalStateException("Bad Password or corrupted file!")
+     } 
+
+     // now decrypt the rest of the bytes, which
+     // is the data payload
      combine(cipher, instr, outstr)     
   }
 

@@ -32,15 +32,18 @@ object Crypt {
  
      val instream = new FileInputStream(fname)
      val outstream = new FileOutputStream( outname )
-
-     if (decrypting) {
-        SpritzCipher.decrypt(pw,instream,outstream)
-     } else {
-        SpritzCipher.encrypt(pw,instream,outstream)
+     try {
+       if (decrypting) {
+          SpritzCipher.decrypt(pw,instream,outstream)
+       } else {
+          SpritzCipher.encrypt(pw,instream,outstream)
+       }
+     } catch {
+        case e: Exception => println("Error: " + e.toString())
+     } finally {
+       instream.close()
+       outstream.close()
      }
-
-     instream.close()
-     outstream.close()
   }
 
   def main(args: Array[String]): Unit = {
