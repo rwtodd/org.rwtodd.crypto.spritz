@@ -32,7 +32,7 @@ spritz.scala: c24f02ce8c65f86cc61dbbf486803f5ff7c93e2c2201037c5e99c1421706eeae
 spritz_crypt.scala: d9e3ae2e8ab2c869149304323920301216a7e688ada88d9350816260e7f35bde
 spritz_hash.scala: 71aa2708801ec8756765bbebe1bfcac41f669b4df811bfa84e0c05dcf351b09a
 
-> scala rwt.spritz.Crypt <<password>> file2 file2
+> scala rwt.spritz.Crypt <<password>> file1 file2
 ```
 
 [1]: http://people.csail.mit.edu/rivest/pubs/RS14.pdf
