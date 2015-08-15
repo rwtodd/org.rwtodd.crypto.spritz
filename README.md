@@ -1,4 +1,5 @@
-# spritz_cipher
+# spritz cipher
+
 A java implementation of the Spritz sponge-like stream cipher.
 
 I read about this fun cipher [here (RS14.pdf)][1], and
@@ -10,6 +11,10 @@ to java to compare the two.  Here's what I found:
      11 class files (24kb).
 
 I think I'll stick with the java version!
+
+_Edit 2015-08-15_: I also implemented enough to do hashing in golang. Check
+out the `go_version` subdirectory's README.md to see how that went!  Spoiler
+alert: the coding was great but it ran at half speed compared to scala.
 
 The class has all the 
 methods int he PDF spec, and exposes the ones like
