@@ -18,24 +18,41 @@ package rwt.spritz;
 
 import com.waywardcode.crypto.SpritzCipher;
 import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.File;
+import java.util.Arrays;
 
 public class Hash {
  
-  private static void doOne(String fname) 
-    throws java.io.IOException {
-      FileInputStream fstream = new FileInputStream(fname);
-      byte[] answer = SpritzCipher.hash(256, fstream);
-      fstream.close();
-   
-      System.out.printf("%s: ",fname);
-      for(byte b: answer) { System.out.printf("%02x",b); }
+  private static void doOneFile(File f) {
+    try(FileInputStream fstream = new FileInputStream(f)) {
+
+      final byte[] answer = SpritzCipher.hash(256, fstream);
+      System.out.printf("%s: ",f.getPath());
+      for(final byte b: answer) { System.out.printf("%02x",b); }
       System.out.println();
+
+    } catch (IOException e) {
+      System.err.println(f.getPath() + ": error: " + e);
+    }
   }
 
-  public static void main(String[] args) throws java.io.IOException {
-      for(String arg: args) {
-         doOne(arg);
+  private static void doOneArgument(final File f) {
+      if(!f.exists()) {
+        System.err.println(f.getName() + ": File does not exist!"); 
+        return;
       }
+
+      if(f.isDirectory()) {
+         Arrays.stream(f.listFiles()).forEach(Hash::doOneArgument);
+      }
+      else {
+        doOneFile(f);
+      }
+  }
+
+  public static void main(String[] args) {
+      Arrays.stream(args).forEach(arg  -> doOneArgument(new File(arg)) );
   }
 
 }
