@@ -16,6 +16,14 @@ _Edit 2015-08-15_: I also implemented enough to do hashing in golang. Check
 out the `go_version` subdirectory's README.md to see how that went!  Spoiler
 alert: the coding was great but it ran at half speed compared to scala.
 
+_Edit: 2015-08-25_: I made a C version to see how much it would 
+trounce the java versoin. Surpise: the java was faster.  I'm a 
+little stumped as to why, since the C version allocates once and
+the rest is just fread+computation.  That makes me think fread 
+is the achilles' heel here.  If anyone can improve it while 
+sticking to the C library (e.g., no `mmap`), I'd be interested
+in how.
+
 The class has all the 
 methods int he PDF spec, and exposes the ones like
 `absorb` and `squeeze` that are used to encrypt, decrypt,
