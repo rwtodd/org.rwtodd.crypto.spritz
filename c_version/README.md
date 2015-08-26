@@ -21,4 +21,7 @@ Java FTW?  I guess...
 
 (the tests were run on OS X Yosemite)
 
+_Edit: 2015-08-26_: I ran the tests again on a Windows 10 laptop, 
+and java still edges out C here.  (4.6s vs 5.1s on the same
+file as the OS X test).
 

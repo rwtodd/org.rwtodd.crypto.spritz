@@ -1,6 +1,13 @@
 # spritz cipher
 
-A java implementation of the Spritz sponge-like stream cipher.
+Implementations of the Spritz sponge-like stream cipher in
+`java`, `scala`, `go`, and `c`.  The `java` and `scala` 
+versions have both hashing and encryption convenience 
+functions. The others have the full algorithm but 
+are only set up to help you hash. 
+
+
+## Story
 
 I read about this fun cipher [here (RS14.pdf)][1], and
 decided to implement it in scala.  After that, I converted it
@@ -10,14 +17,14 @@ to java to compare the two.  Here's what I found:
   * `javac` produced 1 class file (4kb), while `scalac` produced
      11 class files (24kb).
 
-I think I'll stick with the java version!
+I decided to stick with the java version!
 
 _Edit 2015-08-15_: I also implemented enough to do hashing in golang. Check
 out the `go_version` subdirectory's README.md to see how that went!  Spoiler
 alert: the coding was great but it ran at half speed compared to scala.
 
 _Edit: 2015-08-25_: I made a C version to see how much it would 
-trounce the java versoin. Surpise: the java was faster.  I'm a 
+trounce the java version. Surprise: the java was faster!  I'm a 
 little stumped as to why, since the C version allocates once and
 the rest is just fread+computation.  That makes me think fread 
 is the achilles' heel here.  If anyone can improve it while 
@@ -44,16 +51,15 @@ SpritzCipher.encrypt(password, instream, outstream)
 SpritzCipher.decrypt(password, instream, outstream)
 ```
 
-I had scala command-line programs for hashing and encrypting. I
-still need to reimplement those in java. 
+I made command-line programs for hashing and encrypting. 
 
 ```
-> scala rwt.spritz.Hash *.scala
+> java rwt.spritz.Hash *.scala
 spritz.scala: c24f02ce8c65f86cc61dbbf486803f5ff7c93e2c2201037c5e99c1421706eeae
 spritz_crypt.scala: d9e3ae2e8ab2c869149304323920301216a7e688ada88d9350816260e7f35bde
 spritz_hash.scala: 71aa2708801ec8756765bbebe1bfcac41f669b4df811bfa84e0c05dcf351b09a
 
-> scala rwt.spritz.Crypt <<password>> file1 file2
+> java rwt.spritz.Crypt <<password>> file1 file2
 ```
 
 [1]: http://people.csail.mit.edu/rivest/pubs/RS14.pdf
