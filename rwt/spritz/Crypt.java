@@ -16,24 +16,40 @@
 
 package rwt.spritz;
 
-import com.waywardcode.crypto.SpritzCipher;
+import com.waywardcode.crypto.SpritzInputStream;
+import com.waywardcode.crypto.SpritzOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.File;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Arrays;
 
 public class Crypt {
+
+  // helper function to fully copy the input to the output
+  private static void copyStream(final InputStream is, final OutputStream os) 
+    throws IOException {
+      final byte[] buffer = new byte[4096];
+ 
+      int count = is.read(buffer,0,buffer.length) ;
+      while(count >= 0) {
+         os.write(buffer,0,count);
+         count = is.read(buffer,0,buffer.length);
+      }
+  }
+
  
   private static void decrypt(final String key, final File f) {
     final String path = f.getPath();
     final String decryptedName = path.substring(0,path.length() - 7);
  
-    try(final FileInputStream istream = new FileInputStream(f);
+    try(final InputStream istream = new SpritzInputStream(key, new FileInputStream(f));
         final FileOutputStream ostream = new FileOutputStream(decryptedName)
        ) {
 
-      SpritzCipher.decrypt(key, istream, ostream);
+      copyStream(istream,ostream);
       System.out.printf("%s -> %s\n",path, decryptedName);
 
     } catch (IOException e) {
@@ -45,11 +61,12 @@ public class Crypt {
     final String path = f.getPath();
     final String encryptedName = path + ".spritz";
  
-    try(final FileInputStream istream = new FileInputStream(f);
-        final FileOutputStream ostream = new FileOutputStream(encryptedName)
+    try(final InputStream istream = new FileInputStream(f);
+        final OutputStream ostream = new SpritzOutputStream(key, 
+                                                           new FileOutputStream(encryptedName))
        ) {
 
-      SpritzCipher.encrypt(key, istream, ostream);
+      copyStream(istream,ostream);
       System.out.printf("%s -> %s\n",path, encryptedName);
 
     } catch (IOException e) {

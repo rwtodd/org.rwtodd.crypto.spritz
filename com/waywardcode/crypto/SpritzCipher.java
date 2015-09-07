@@ -137,12 +137,12 @@ public class SpritzCipher {
     * @param buf a buffer of data to encrypt/decrypt 
     *   against the cipher stream.
     * @param start the first index of the array to transform 
-    * @param end the end of the range to transform, exclusive 
-    * @return the transformed array
+    * @param len the length of the range to transform
     */
-  public void squeezeXOR(final byte[] buf, final int start, final int end) {
+  public void squeezeXOR(final byte[] buf, final int start, int len) {
     if (a > 0) { shuffle(); }
-    for(int idx = start; idx < end; ++idx) {
+    len = start + len;
+    for(int idx = start; idx < len; ++idx) {
        buf[idx] = (byte)(buf[idx] ^ dripOne());
     }
   }
@@ -152,7 +152,6 @@ public class SpritzCipher {
     * arrays of data.
     * @param buf a buffer of data to encrypt/decrypt 
     *   against the cipher stream.
-    * @return the transformed array
     */
   public void squeezeXOR(final byte[] buf) { squeezeXOR(buf, 0, buf.length); }
 
@@ -246,135 +245,6 @@ public class SpritzCipher {
      hasher.absorbStop();
      hasher.absorb( (byte)bytes );
      return hasher.squeeze(bytes);
-  }
-
-  /** XORs a cipher with an input stream, writing an output stream. 
-    * Note that 
-    * the method reads until no more data is available, but
-    * it doesn't close the stream.
-    * @param instr the data to encrypt/decrypt.
-    * @param outstr the stream where the output is written.
-    */
-  public void combine(final java.io.InputStream instr,
-                      final java.io.OutputStream outstr) 
-     throws java.io.IOException {
-      final byte[] buffer = new byte[4096];
- 
-      int count = instr.read(buffer) ;
-      while(count >= 0) {
-         squeezeXOR(buffer,0,count);
-         outstr.write(buffer,0,count);
-         count = instr.read(buffer);
-      }
-   }
-
-  /** Encrypt an input stream with a password.
-    * This method creates a 4-byte random initialization
-    * vector, and writes that to the output unencrypted.
-    * It then encrypts 4 random bytes, and the 32-bit hash
-    * of those bytes.  This way, upon decryption, we can
-    * tell immediately if we are using the correct password
-    * (since it would be highly unlikely to get the correct
-    * hash if we had the wrong spritz stream). 
-    * Finally, the data from the input is combined with the
-    * cipher stream and written out.
-    * @param key the password to use. It is converted to UTF-8 bytes.
-    * @param instr the source of the data to encrypt.
-    * @param outstr where the output is written.
-    */
-  public static void encrypt(final String key,
-                             final java.io.InputStream instr, 
-                             final java.io.OutputStream outstr) 
-    throws java.io.IOException {
-
-     final java.util.Random rnd = new java.util.Random(System.currentTimeMillis());
-     final byte[] iv = new byte[4];
-     rnd.nextBytes(iv);
-
-     final SpritzCipher cipher = cipherStream(key, iv);
-
-     // first, write the iv..
-     outstr.write(iv);
-
-     // now, write 4 random bytes, and a hash of them...
-     // so we can tell if we have the right password
-     // on decryption
-     final byte[] randomBytes = new byte[4];
-     rnd.nextBytes(randomBytes);
-     final byte[] hashedBytes = hash(32,randomBytes);
-     cipher.squeezeXOR(randomBytes);
-     cipher.squeezeXOR(hashedBytes);
-     outstr.write(randomBytes);
-     outstr.write(hashedBytes);
-
-     // now just write the encrypted stream...
-     cipher.combine(instr, outstr);
-
-  }
-
-  private static int readFully(final java.io.InputStream instr,
-                               final byte[] buffer) 
-    throws java.io.IOException {
-
-      int total = buffer.length;
-      int offset = 0;
-
-      while( total > 0 ) {
-         int amount = instr.read(buffer, offset, total);
-         if (amount >= 0) {
-           offset += amount;
-           total -= amount;
-         } else {
-            total = 0;
-         }
-      } 
-      return offset;
-  }
-
-  /** Decrypt an input stream with a password.
-    * This method reads a 4-byte random initialization
-    * vector, and creates a cipher stream with the IV and
-    * the given key.  It then decrypts 4 bytes, and creates
-    * 32-bit hash of those bytes.  If the next 4 decrypted
-    * bytes match the hash, we assume we have the correct
-    * decryption stream.  At this point we decrypt
-    * the rest of the bytes from the input stream, and write
-    * the results to the output stream.
-    * @param key the password to use. It is converted to UTF-8 bytes.
-    * @param instr the source of the data to decrypt.
-    * @param outstr where the output is written.
-    */
-  public static void decrypt(final String key, 
-                             final java.io.InputStream instr, 
-                             final java.io.OutputStream outstr) 
-    throws java.io.IOException {
-     
-     final byte[] iv = new byte[4];
-     if( readFully(instr, iv) != 4 ) {
-         throw new IllegalArgumentException("Instream wasn't even long enough to contain an IV!");
-     }
-
-     final SpritzCipher cipher = cipherStream(key, iv);
-
-     // now verify the random bytes and their hash...
-     final byte[] randomBytes = new byte[4];
-     if( readFully(instr, randomBytes) != 4 ) {
-         throw new IllegalArgumentException("Instream wasn't even long enough for a header!");
-     }
-     final byte[] randomHash = new byte[4];
-     if( readFully(instr, randomHash) != 4 ) {
-         throw new IllegalArgumentException("Instream wasn't even long enough for a header!");
-     }
-     cipher.squeezeXOR(randomBytes);
-     cipher.squeezeXOR(randomHash); 
-     final byte[] testHash = hash(32,randomBytes);
-     if( !java.util.Arrays.equals(testHash,randomHash) ) {
-         throw new IllegalStateException("Bad Password or corrupted file!");
-     } 
-
-     // now decrypt the rest of the bytes, which
-     // is the data payload
-     cipher.combine(instr, outstr) ;
   }
 
 }
