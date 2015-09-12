@@ -1,7 +1,7 @@
 ( vim: set filetype=forth : )
 
 ( Spritz State -- N.B. I depend on 8-bit CHARS )
-CREATE SPRITZ-STATE 6 256 + CHARS ALLOT DOES> swap + ;
+CREATE SPRITZ-STATE 6 256 + ALLOT DOES> + ;
 256 SPRITZ-STATE CONSTANT SI
 257 SPRITZ-STATE CONSTANT SJ
 258 SPRITZ-STATE CONSTANT SK
@@ -14,39 +14,51 @@ CREATE SPRITZ-STATE 6 256 + CHARS ALLOT DOES> swap + ;
   0 SI c!  0 SJ c!  0 SK c!
   0 SZ c!  0 SA c!  1 SW c! ;
 
-: state-swap ( i j -- ) 
-     SPRITZ-STATE swap SPRITZ-STATE
-     dup c@ -rot over c@ swap c! c! ; 
+: state-swap ( addr1 addr2 -- ) 
+     POSTPONE dup POSTPONE c@ POSTPONE -rot 
+     POSTPONE over POSTPONE c@ POSTPONE swap
+     POSTPONE c! POSTPONE c! ; immediate
 
 : gcd ( e1 e2 -- gcd ) 
    BEGIN dup 0<> WHILE tuck mod REPEAT drop ;
 
 : c+ POSTPONE + 255 POSTPONE LITERAL POSTPONE AND ; immediate
-: state-update ( n -- ) 
-   0 DO
-      SI c@ SW c@ c+ dup 2dup SI c! 
-      SPRITZ-STATE c@ SJ c@ c+     
-      SPRITZ-STATE c@ SK C@ tuck c+   dup dup >r SJ c!             
-      SPRITZ-STATE c@ + + SK c!       r> state-swap       
-   LOOP ;  
 
-: whip ( -- ) 
-   512 state-update BEGIN SW c@ 1+ dup SW c!  
-                          256 gcd 1 = 
-                    UNTIL ;
+( SW c@ SI c@  rot 
+   0 DO
+      over c+ dup dup       
+      SPRITZ-STATE tuck c@  SJ c@ c+     
+      SPRITZ-STATE c@ SK C@ tuck c+   dup SJ c!             
+      SPRITZ-STATE dup >r c@ + + SK c! r> 
+      state-swap 
+   LOOP SI c! drop ;   )
+
+: state-update ( n -- ) 
+   SW c@ SI c@  rot 
+   0 DO
+      over c+ dup dup       
+      SPRITZ-STATE tuck c@  SJ c@ c+     
+      SPRITZ-STATE c@ SK C@ tuck c+   dup SJ c!             
+      SPRITZ-STATE dup >r c@ + + SK c! r> 
+      state-swap 
+   LOOP SI c! drop ;  
+
+: whip ( -- ) 512 state-update 
+    SW c@ BEGIN 1+   dup 256 gcd 1 =  UNTIL SW c! ;
 
 : crush ( -- ) 
-   128 0 DO 
-     I SPRITZ-STATE c@  255 I - SPRITZ-STATE c@ 
-     >   IF  I    255 I -   state-swap  THEN
-   LOOP ;
+   128 0 DO    
+     255 I - SPRITZ-STATE I SPRITZ-STATE 2dup c@ swap c@
+     >   IF state-swap ELSE 2drop THEN
+   LOOP ;  
 
 : shuffle ( -- ) whip crush whip crush whip  0 SA c! ;
 
 : maybe-shuffle ( lim -- ) SA c@ < IF shuffle THEN ;
 
 : absorb-nibble ( nibble -- )
-   127 maybe-shuffle  128 +  SA c@ dup 1+ SA c!   state-swap ;
+   127 maybe-shuffle  128 + SPRITZ-STATE  SA c@ dup 1+ SA c! SPRITZ-STATE  
+   state-swap ;
     
 : absorb ( byte -- )
    dup 15    AND absorb-nibble  
@@ -87,3 +99,4 @@ CREATE SPRITZ-STATE 6 256 + CHARS ALLOT DOES> swap + ;
       bounds DO I c@ 0 <<# # # #> type #>> LOOP 
     DECIMAL ; 
 
+S" Amber_Diceless.djvu" PAD 32 file-hash PAD 32 cr print-hash bye
