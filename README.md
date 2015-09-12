@@ -31,8 +31,15 @@ is the achilles' heel here.  If anyone can improve it while
 sticking to the C library (e.g., no `mmap`), I'd be interested
 in how.
 
+_Edit: 2015-09-12_: I made a forth version. On interpreted gforth
+it runs about 6.5 times slower than java. But it was fun to write!
+
+
+About the Java Version
+----------------------
+
 The class has all the 
-methods int he PDF spec, and exposes the ones like
+methods in the PDF spec, and exposes the ones like
 `absorb` and `squeeze` that are used to encrypt, decrypt,
 and hash.
 
