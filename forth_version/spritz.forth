@@ -90,4 +90,3 @@ CREATE SPRITZ-STATE 6 256 + ALLOT DOES> + ;
       bounds DO I c@ 0 <<# # # #> type #>> LOOP 
     DECIMAL ; 
 
-S" Amber_Diceless.djvu" PAD 32 file-hash PAD 32 cr print-hash bye
