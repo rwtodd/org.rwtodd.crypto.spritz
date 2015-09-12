@@ -24,15 +24,6 @@ CREATE SPRITZ-STATE 6 256 + ALLOT DOES> + ;
 
 : c+ POSTPONE + 255 POSTPONE LITERAL POSTPONE AND ; immediate
 
-( SW c@ SI c@  rot 
-   0 DO
-      over c+ dup dup       
-      SPRITZ-STATE tuck c@  SJ c@ c+     
-      SPRITZ-STATE c@ SK C@ tuck c+   dup SJ c!             
-      SPRITZ-STATE dup >r c@ + + SK c! r> 
-      state-swap 
-   LOOP SI c! drop ;   )
-
 : state-update ( n -- ) 
    SW c@ SI c@  rot 
    0 DO
