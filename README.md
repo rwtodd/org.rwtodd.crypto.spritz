@@ -32,7 +32,7 @@ sticking to the C library (e.g., no `mmap`), I'd be interested
 in how.
 
 _Edit: 2015-09-12_: I made a forth version. On interpreted gforth
-it runs about 6.5 times slower than java. But it was fun to write!
+it runs about 4.8 times slower than java. But it was fun to write!
 
 
 About the Java Version

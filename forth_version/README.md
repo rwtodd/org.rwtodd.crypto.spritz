@@ -5,7 +5,7 @@ I couldn't help myself... I made a forth version
 of the hash function to compare it.
 
 On a large file, the java version took ~2.5 seconds,
-and with gforth-fast, I got ~16 seconds. So about 6.5x 
+and with gforth-fast, I got ~12 seconds. So about 4.8x 
 slower than the java version.
 
 ```
