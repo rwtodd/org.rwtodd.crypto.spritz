@@ -1,7 +1,8 @@
 ( vim: set filetype=forth : )
 
 ( Spritz State -- N.B. I depend on 8-bit CHARS )
-CREATE SPRITZ-STATE 6 256 + ALLOT DOES> + ;
+: CHARRAY ( size "name" -- ) CREATE ALLOT DOES> + ;
+6 256 + CHARRAY SPRITZ-STATE
 256 SPRITZ-STATE CONSTANT SI
 257 SPRITZ-STATE CONSTANT SJ
 258 SPRITZ-STATE CONSTANT SK
@@ -31,7 +32,7 @@ CREATE SPRITZ-STATE 6 256 + ALLOT DOES> + ;
       SPRITZ-STATE tuck c@  SJ c@ c+     
       SPRITZ-STATE c@ SK C@ tuck c+   dup SJ c!             
       SPRITZ-STATE dup >r c@ + + SK c! r> 
-      state-swap 
+      state-swap  
    LOOP SI c! drop ;  
 
 : whip ( -- ) 512 state-update 
@@ -84,9 +85,8 @@ CREATE SPRITZ-STATE 6 256 + ALLOT DOES> + ;
    fileid close-file throw
    absorb-stop dup absorb  drip-many ;
 
-
 : print-hash ( src u -- ) 
     HEX 
-      bounds DO I c@ 0 <<# # # #> type #>> LOOP 
+      bounds DO I c@ 0 <# # # #> type LOOP 
     DECIMAL ; 
 
