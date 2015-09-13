@@ -33,7 +33,8 @@ in how.
 
 _Edit: 2015-09-12_: I made a forth version. On interpreted gforth
 it runs about 4.8 times slower than java. But it was fun to write!
-
+When I compile it with MPE Forth, it's about 1.4x slower than
+the java. Much more respectable.
 
 About the Java Version
 ----------------------
