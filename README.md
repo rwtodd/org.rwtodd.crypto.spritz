@@ -1,7 +1,8 @@
 # spritz cipher
 
 Implementations of the Spritz sponge-like stream cipher in
-`java`, `scala`, `go`, and `c`.  The `java` and `scala` 
+`scala`, `java`, `go`, `c`, `forth`, and `c++` (in that order).  
+The `java` and `scala` 
 versions have both hashing and encryption convenience 
 functions. The others have the full algorithm but 
 are only set up to help you hash. 
@@ -35,6 +36,10 @@ _Edit: 2015-09-12_: I made a forth version. On interpreted gforth
 it runs about 4.8 times slower than java. But it was fun to write!
 When I compile it with MPE Forth, it's about 1.4x slower than
 the java. Much more respectable.
+
+_Edit: 2015-09-13_: I converted the C to C++ because I wanted
+to see if I could feel a productivity difference using iterators
+for everything.  My findings are in the readme in that directory.
 
 About the Java Version
 ----------------------
