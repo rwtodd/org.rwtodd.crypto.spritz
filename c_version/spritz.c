@@ -30,8 +30,7 @@ void destroy_spritz(spritz_state s) {
   free(s);
 }
 
-static inline void swap(spritz_state s, size_t el1, size_t el2) {
-  uint8_t *const arr = s->mem;
+static inline void swap(uint8_t *const arr, size_t el1, size_t el2) {
   uint8_t tmp = arr[el1];
   arr[el1] = arr[el2];
   arr[el2] = tmp;
@@ -40,11 +39,22 @@ static inline void swap(spritz_state s, size_t el1, size_t el2) {
 /* when adding indices... need to clip them at 256 */
 #define smem(x)  s->mem[ (x) & 0xff ]
 
-static void update(spritz_state s) {
-  s->i += s->w;
-  s->j = s->k + smem(s->j+s->mem[s->i]);
-  s->k = s->i + s->k + s->mem[s->j];
-  swap(s, s->i, s->j);
+static void update(spritz_state s, int times) {
+  uint8_t mi = s->i;
+  uint8_t mj = s->j;
+  uint8_t mk = s->k;
+  const uint8_t mw = s->w ;
+  
+  while(times--) {
+    mi += mw;
+    mj = mk + smem(mj+s->mem[mi]);
+    mk = mi + mk + s->mem[mj];
+    swap(s->mem, mi, mj);
+  }
+ 
+  s->i = mi;
+  s->j = mj;
+  s->k = mk;
 }
 
 static int gcd(const int e1, const int e2) {
@@ -53,7 +63,7 @@ static int gcd(const int e1, const int e2) {
 }
 
 static void whip(spritz_state s, const int amt) {
-  for(int ctr = 0; ctr < amt; ++ctr) update(s);
+  update(s,amt);
   do {
     s->w++;
   } while(gcd(s->w, N) != 1);
@@ -62,7 +72,7 @@ static void whip(spritz_state s, const int amt) {
 
 static void crush(spritz_state s) {
   for(size_t v = 0; v < (N/2); ++v) {
-    if(s->mem[v] > s->mem[N-1-v]) swap(s,v,N-1-v);
+    if(s->mem[v] > s->mem[N-1-v]) swap(s->mem,v,N-1-v);
   }
 }
 
@@ -77,7 +87,7 @@ static void shuffle(spritz_state s) {
 
 static inline void absorb_nibble(spritz_state s, uint8_t x) {
   if(s->a == N/2) shuffle(s); 
-  swap(s, s->a, (N/2+x));
+  swap(s->mem, s->a, (N/2+x));
   s->a++;
 }
 
@@ -100,7 +110,7 @@ void spritz_absorb_stop(spritz_state s) {
 }
 
 static uint8_t drip_one(spritz_state s) {
-  update(s);
+  update(s,1);
   s->z = smem(s->j + smem(s->i + smem(s->z + s->k)));
   return s->z;
 }

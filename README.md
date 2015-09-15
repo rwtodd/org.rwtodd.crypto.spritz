@@ -25,12 +25,9 @@ out the `go_version` subdirectory's README.md to see how that went!  Spoiler
 alert: the coding was great but it ran at half speed compared to scala.
 
 _Edit: 2015-08-25_: I made a C version to see how much it would 
-trounce the java version. Surprise: the java was faster!  I'm a 
-little stumped as to why, since the C version allocates once and
-the rest is just fread+computation.  That makes me think fread 
-is the achilles' heel here.  If anyone can improve it while 
-sticking to the C library (e.g., no `mmap`), I'd be interested
-in how.
+trounce the java version. Surprise: the java was faster!  A couple
+weeks later I looked at it and found an optimization that makes
+C the speed king again.  See the README in the c_version directory.
 
 _Edit: 2015-09-12_: I made a forth version. On interpreted gforth
 it runs about 4.8 times slower than java. But it was fun to write!

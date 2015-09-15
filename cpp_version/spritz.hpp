@@ -11,7 +11,7 @@ class cipher {
     uint8_t i, j, k, z, a, w; 
     uint8_t mem[256];
 
-    void update();
+    void update(int amt);
     void whip(const int amt);
     void crush();
     void shuffle();

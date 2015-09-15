@@ -24,11 +24,22 @@ static inline void swap(uint8_t* const arr,
 /* when adding indices... need to clip them at 256 */
 #define clip_mem(x)  mem[ (x) & 0xff ]
 
-void spritz::cipher::update() {
-  i += w;
-  j = k + clip_mem(j+mem[i]);
-  k = i + k + mem[j];
-  swap(mem, i, j);
+void spritz::cipher::update(int times) {
+  uint8_t mi = i;
+  uint8_t mj = j;
+  uint8_t mk = k;
+  const uint8_t mw = w ;
+  
+  while(times--) {
+    mi += mw;
+    mj = mk + clip_mem(mj+mem[mi]);
+    mk = mi + mk + mem[mj];
+    swap(mem, mi, mj);
+  }
+ 
+  i = mi;
+  j = mj;
+  k = mk;
 }
 
 static int gcd(const int e1, const int e2) {
@@ -37,7 +48,7 @@ static int gcd(const int e1, const int e2) {
 }
 
 void spritz::cipher::whip(const int amt) {
-  for(int ctr = 0; ctr < amt; ++ctr) update();
+  update(amt);
   do {
     w++;
   } while(gcd(w, 256) != 1);
@@ -75,7 +86,7 @@ void spritz::cipher::absorb_stop() {
 
 uint8_t spritz::cipher::drip() {
   if(a > 0) shuffle();
-  update();
+  update(1);
   z = clip_mem(j + clip_mem(i + clip_mem(z + k)));
   return z;
 }

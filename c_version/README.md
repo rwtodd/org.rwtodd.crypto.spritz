@@ -8,20 +8,51 @@ I tried turning off the buffering on the `FILE *` in case
 that was the problem, but that only slightly changed the
 outcome.
 
-When hashing a 22MB file, the java version takes 2.78s, and the
-C version takes 3.82s.  I'm a little surprised, since there's
-really not a lot for me to "screw up" about the C implementation.
-It only allocates once, at the start of the hashing process. The
-rest is just file reads and computation.
+My initial try, surprisingly, was slower than the java version.
+On a 460MB file, it ran in 79 seconds vs. java's 60 seconds.
 
-So... just as with the `go` implementation, I didn't bother pushing
-forward to do the encrypter/decrypter.
+However, looking at compiler's assembly output for the innermost loop,
+I realized I could make an important optimization.  Here's the 
+unoptimized loop:
 
-Java FTW?  I guess...
+```
+static void update(spritz_state s, int times) {
+  while(times--) {
+    s->i += s->w;
+    s->j = s->k + smem(s->j+s->mem[s->i]);
+    s->k = s->i + s->k + s->mem[s->j];
+    swap(s->mem, s->i, s->j);
+  }
+}
+```
 
-(the tests were run on OS X Yosemite)
+... and here's the optimized version:
 
-_Edit: 2015-08-26_: I ran the tests again on a Windows 10 laptop, 
-and java still edges out C here.  (4.6s vs 5.1s on the same
-file as the OS X test).
+```
+static void update(spritz_state s, int times) {
+  uint8_t mi = s->i;
+  uint8_t mj = s->j;
+  uint8_t mk = s->k;
+  const uint8_t mw = s->w ;
+  
+  while(times--) {
+    mi += mw;
+    mj = mk + smem(mj+s->mem[mi]);
+    mk = mi + mk + s->mem[mj];
+    swap(s->mem, mi, mj);
+  }
+ 
+  s->i = mi;
+  s->j = mj;
+  s->k = mk;
+}
+```
+
+In the optimized version, I'm helping the compiler to see that it
+doesn't need to store the intermediate values of `i`, `j`, and `k`
+back into the state structure until it's done with all the iterations.
+
+With that change, the C version takes 54 seconds against java's 60. Still
+not a big win for C... and I chalk that up to my naive use of `fread`
+vs. java's probably much more optimized I/O.  
 
