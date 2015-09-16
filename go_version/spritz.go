@@ -36,7 +36,7 @@ func AbsorbMany(ss *SpritzState, bs []byte) {
 }
 
 func swap(arr *[N]byte, e1 int, e2 int) {
-    arr[e1],arr[e2] = arr[e2],arr[e1]
+	arr[e1], arr[e2] = arr[e2], arr[e1]
 }
 
 func absorbNibble(ss *SpritzState, x byte) {
@@ -61,10 +61,8 @@ func gcd(e1 int, e2 int) int {
 	return gcd(e2, e1%e2)
 }
 
-func whip(ss *SpritzState, amt int) {
-	for i := 0; i < amt; i++ {
-		update(ss)
-	}
+func whip(ss *SpritzState) {
+	update(ss, N*2)
 	ss.w++
 	for gcd(int(ss.w), 256) != 1 {
 		ss.w++
@@ -80,26 +78,41 @@ func crush(ss *SpritzState) {
 }
 
 func shuffle(ss *SpritzState) {
-	whip(ss, N*2)
+	whip(ss)
 	crush(ss)
-	whip(ss, N*2)
+	whip(ss)
 	crush(ss)
-	whip(ss, N*2)
+	whip(ss)
 	ss.a = 0
 }
 
-func update(ss *SpritzState) {
-	ss.i += ss.w
-	ss.j = ss.k + ss.s[ss.j+ss.s[ss.i]]
-	ss.k = ss.i + ss.k + ss.s[ss.j]
-	ss.s[ss.i], ss.s[ss.j] = ss.s[ss.j], ss.s[ss.i]
+func update(ss *SpritzState, amt int) {
+	var mi byte = ss.i
+	var mj byte = ss.j
+	var mk byte = ss.k
+	var mw byte = ss.w
+
+	for amt > 0 {
+		mi += mw
+		smi := ss.s[mi]
+		mj = mk + ss.s[mj+smi]
+		smj := ss.s[mj]
+		mk = mi + mk + smj
+		ss.s[mi] = smj
+		ss.s[mj] = smi
+		amt--
+	}
+
+	ss.i = mi
+	ss.j = mj
+	ss.k = mk
 }
 
 func Drip(ss *SpritzState) byte {
 	if ss.a > 0 {
 		shuffle(ss)
 	}
-	update(ss)
+	update(ss, 1)
 	ss.z = ss.s[ss.j+ss.s[ss.i+ss.s[ss.z+ss.k]]]
 	return ss.z
 }
