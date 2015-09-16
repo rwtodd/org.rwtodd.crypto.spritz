@@ -21,13 +21,43 @@ func update(ss *SpritzState) {
 
 ```
 
-... which isn't promising, since there isn't much to work with
-but a bunch of computations.  I tried pulling the state components
-into local variables and working on them, in case the lookup into
-`SpritzState` was the issue, but that didn't help.  SpritzState is
-just a pointer to a plain struct, anyway.
+I ran into a similar bottleneck on the C/C++ versions,
+and looking at the assembly output I decided I could help
+the compiler by looping inside of `update` and taking the 
+assignments back into SpritzState out of the loop:
 
-So, I didn't bother implementing encryption and decryption.
+```
+func update(ss *SpritzState, amt int) {
+	var mi byte = ss.i
+	var mj byte = ss.j
+	var mk byte = ss.k
+	var mw byte = ss.w
+
+	for amt > 0 {
+		mi += mw
+		smi := ss.s[mi]
+		mj = mk + ss.s[mj+smi]
+		smj := ss.s[mj]
+		mk = mi + mk + smj
+		ss.s[mi] = smj
+		ss.s[mj] = smi
+		amt--
+	}
+
+	ss.i = mi
+	ss.j = mj
+	ss.k = mk
+}
+```
+
+It's not as pretty, but on the C/C++/golang code it really
+helped.  For the golang version, The time on a large file
+went from 13.112s to 9.669s.  For comparison, the java
+version took 7.424s and the C version took 6.736s on the
+same file.
+
+I haven't implemented encryption and decryption cmdline utils
+yet.
 
 If you build this, you can run it against one or more filenames like so:
 
