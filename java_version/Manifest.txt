@@ -1,0 +1,5 @@
+Name: rwt/spritz
+Implementation-Title: Spritz Stream Cipher
+Implementation-Version: 1.0
+Implementation-Vendor: Richard Todd (WaywardCode.com)
+Main-Class: rwt.spritz.Hash

@@ -62,20 +62,20 @@ class SpritzCipher {
   } 
 
   private def shuffle() = {
-     whip(512)
+     whip()
      crush()
-     whip(512)
+     whip()
      crush()
-     whip(512)
+     whip()
      a = 0
   }
 
-  private def whip(r: Int) = {
+  private def whip() = {
     def GCD(e1: Int, e2: Int): Int = {
        if (e2 == 0) e1 else GCD(e2, e1 % e2)
     }
 
-    (1 to r) foreach { _ => update() }
+    update(512)
     do { 
       w = (w + 1) & 0xff
     } while(GCD(w,256) != 1)
@@ -130,14 +130,28 @@ class SpritzCipher {
     dripOne().toByte
   }
 
-  private def update() = {
-     i = (i + w) & 0xff 
-     val si = s(i) & 0xff
-     val sjsi = s( (j + si) & 0xff ) & 0xff
-     j = ( k + sjsi ) & 0xff 
-     val sj = s(j) & 0xff
-     k = ( i + k + sj ) & 0xff 
-     swap(i,j)
+  private def update(times: Int = 1) = {
+     var mi = i
+     var mj = j
+     var mk = k
+     val mw = w
+
+     var mtimes = times     
+     while(mtimes > 0) { 
+         mi = (mi + mw) & 0xff 
+         val smi = s(mi) & 0xff
+         val sjsi = s( (mj + smi) & 0xff ) & 0xff
+         mj = ( mk + sjsi ) & 0xff 
+         val smj = s(mj) & 0xff
+         mk = ( mi + mk + smj ) & 0xff 
+         s(mi) = smj.toByte
+         s(mj) = smi.toByte
+         mtimes = mtimes - 1
+     }
+
+     i = mi
+     j = mj
+     k = mk 
   }
 
   private def dripOne(): Int = {
