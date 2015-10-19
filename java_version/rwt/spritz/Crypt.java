@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
+import java.util.stream.Stream;
 
 public class Crypt {
 
@@ -41,55 +42,64 @@ public class Crypt {
   }
 
  
-  private static void decrypt(final String key, final File f) {
+  private static String decrypt(final String key, final File f) {
     final String path = f.getPath();
     final String decryptedName = path.substring(0,path.length() - 7);
+    String report = String.format("%s -> %s",path, decryptedName);
  
     try(final InputStream istream = new SpritzInputStream(key, new FileInputStream(f));
         final FileOutputStream ostream = new FileOutputStream(decryptedName)
        ) {
 
       copyStream(istream,ostream);
-      System.out.printf("%s -> %s\n",path, decryptedName);
 
     } catch (IOException e) {
-      System.err.println(path + ": error: " + e);
+      report = String.format("%s: error: %s", path, e);
     }
+
+    return report;
   }
 
-  private static void encrypt(final String key, final File f) {
+  private static String encrypt(final String key, final File f) {
     final String path = f.getPath();
     final String encryptedName = path + ".spritz";
- 
+    String report = String.format("%s -> %s",path, encryptedName);
+     
     try(final InputStream istream = new FileInputStream(f);
         final OutputStream ostream = new SpritzOutputStream(key, 
                                                            new FileOutputStream(encryptedName))
        ) {
 
       copyStream(istream,ostream);
-      System.out.printf("%s -> %s\n",path, encryptedName);
 
     } catch (IOException e) {
-      System.err.println(path + ": error: " + e);
+      report = String.format("%s: error: %s", path, e);
     }
+
+    return report;
   }
 
+  private static String doOneFile(final String key, final File f) {
+        String answer;
+        if(f.getName().endsWith(".spritz")) {
+           answer = decrypt(key,f);
+        } else {
+           answer = encrypt(key,f);
+        }
+        return answer;
+  }
 
-  private static void doOneArgument(final String key, final File f) {
+  private static Stream<File> doOneArgument(final File f) {
       if(!f.exists()) {
         System.err.println(f.getPath() + ": File does not exist!"); 
-        return;
+        return Stream.empty();
       }
 
       if(f.isDirectory()) {
-        Arrays.stream(f.listFiles()).forEach( subfile -> doOneArgument(key, subfile) );
+        return Arrays.stream(f.listFiles()).flatMap(Crypt::doOneArgument);
       }
       else {
-        if(f.getName().endsWith(".spritz")) {
-           decrypt(key,f);
-        } else {
-           encrypt(key,f);
-        }
+        return Stream.of(f);
       }
   }
 
@@ -99,8 +109,13 @@ public class Crypt {
         return;
       }
       final String key = args[0];
-      Arrays.stream(args).skip(1)
-                         .forEach( f -> doOneArgument(key, new File(f)) );
+      Arrays.stream(args)
+            .skip(1)
+            .parallel()
+            .flatMap(arg -> doOneArgument(new File(arg)))
+            .map(f -> doOneFile(key, f))
+            .sorted()
+            .forEachOrdered(System.out::println);
   }
 
 }

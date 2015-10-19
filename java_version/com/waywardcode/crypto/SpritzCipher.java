@@ -82,11 +82,11 @@ public class SpritzCipher {
   } 
 
   private void shuffle() {
-     whip(512);
+     whip();
      crush();
-     whip(512);
+     whip();
      crush();
-     whip(512);
+     whip();
      a = 0;
   }
 
@@ -94,8 +94,8 @@ public class SpritzCipher {
      if (e2 == 0) { return  e1; }  else { return GCD(e2, e1 % e2); }
   }
 
-  private void whip(final int r) {
-    for(int idx = 0; idx < r; ++idx) { update(); }
+  private void whip() {
+    update(512);
     do { 
       w = (w + 1) & 0xff;
     } while(GCD(w,256) != 1);
@@ -164,18 +164,29 @@ public class SpritzCipher {
     return (byte)dripOne();
   }
 
-  private void update() {
-     i = (i + w) & 0xff ;
-     final int si = s[i] & 0xff ;
-     final int sjsi = s[ (j + si) & 0xff ] & 0xff ;
-     j = ( k + sjsi ) & 0xff  ;
-     final int sj = s[j] & 0xff ;
-     k = ( i + k + sj ) & 0xff ;
-     swap(i,j);
+  private void update(int amt) {
+    int mi = i & 0xff;
+    int mj = j & 0xff;
+    int mk = k & 0xff;
+    final int mw = w & 0xff;
+
+    while(amt-- > 0) {
+      mi = (mi + mw) & 0xff;
+      final int si = s[mi] & 0xff;
+      mj =  (mk + (s[ (mj + si) & 0xff ] & 0xff)) & 0xff;
+      final int sj = s[mj] & 0xff;
+      mk = ( mi + mk + sj ) & 0xff ;
+      s[mi] = (byte)sj;
+      s[mj] = (byte)si;
+    }
+
+    i = mi;
+    j = mj;
+    k = mk;
   }
 
   private int dripOne() {
-     update();
+     update(1);
      final int step1 = s[ (z + k) & 0xff ] & 0xff ;
      final int step2 = s[ (i + step1) & 0xff ] & 0xff ;
      z =  s[ (j + step2) & 0xff ] & 0xff ;

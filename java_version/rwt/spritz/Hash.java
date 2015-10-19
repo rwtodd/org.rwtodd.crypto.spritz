@@ -21,38 +21,47 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.File;
 import java.util.Arrays;
+import java.util.stream.Stream;
 
 public class Hash {
  
-  private static void doOneFile(File f) {
+  private static String doOneFile(File f) {
+    final StringBuilder answer = new StringBuilder();
+    answer.append(f.getPath()).append(": ");
+
     try(FileInputStream fstream = new FileInputStream(f)) {
 
-      final byte[] answer = SpritzCipher.hash(256, fstream);
-      System.out.printf("%s: ",f.getPath());
-      for(final byte b: answer) { System.out.printf("%02x",b); }
-      System.out.println();
+      final byte[] hash = SpritzCipher.hash(256, fstream);
+      for(final byte b: hash) { answer.append(String.format("%02x",b)); }
 
     } catch (IOException e) {
-      System.err.println(f.getPath() + ": error: " + e);
+      answer.append("error! ").append(e);
     }
+
+    return answer.toString();
   }
 
-  private static void doOneArgument(final File f) {
+  private static Stream<File> doOneArgument(final File f) {
       if(!f.exists()) {
         System.err.println(f.getName() + ": File does not exist!"); 
-        return;
+        return Stream.empty();
       }
 
       if(f.isDirectory()) {
-         Arrays.stream(f.listFiles()).forEach(Hash::doOneArgument);
+         return Arrays.stream(f.listFiles()).flatMap(Hash::doOneArgument);
       }
       else {
-        doOneFile(f);
+        return Stream.of(f);
       }
   }
 
   public static void main(String[] args) {
-      Arrays.stream(args).forEach(arg  -> doOneArgument(new File(arg)) );
+      Arrays.stream(args)
+            .parallel()
+            .flatMap(arg  -> doOneArgument(new File(arg)))
+            .map(Hash::doOneFile)
+            .sorted()
+            .forEachOrdered(System.out::println);
   }
 
 }
