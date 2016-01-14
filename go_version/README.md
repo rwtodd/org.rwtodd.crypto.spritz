@@ -1,5 +1,9 @@
 # Go Version
 
+(__Update__: I did a proper Go implementation in [another repository](https://github.com/waywardcode/crypto).
+It provides standard `hash.Hash` and `cipher.Stream` implementations, and has hasher
+and encrypter cmd-line programs.)
+
 For fun, I wrote enough of a golang version to produce the hash
 function.  However, when I ran it on a large (100MB) file, it
 took twice as long as the scala version to finish.
