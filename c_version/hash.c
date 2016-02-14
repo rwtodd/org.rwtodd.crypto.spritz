@@ -12,13 +12,64 @@
 #include<string.h>
 #include<poll.h>
 #include<errno.h>
+#include<stdarg.h>
+
+/* read unbuffered line from pipes */
+static ssize_t read_line(int fd, char *buf, size_t sz) {
+  ssize_t total = 0;
+  --sz; /* account for the '\0' */
+  ssize_t rsz = read(fd,buf,sz);
+  total = rsz; 
+
+  while((rsz > 0) && (buf[rsz-1] != '\n'))  {
+        buf   += rsz;  
+	sz    -= rsz;  
+        rsz = read(fd,buf,sz);
+        total += rsz;
+  }
+     
+  if(rsz < 0) return rsz;
+  
+  buf[rsz] = '\0';
+  return total;
+}
+
+/* write unbuffered line to pipes */
+static ssize_t write_line(int fd, const char* fmt, ...) {
+  static char buffer[1024];
+
+  va_list ap;
+  va_start(ap, fmt);
+  size_t len = vsnprintf(buffer,1023,fmt,ap);
+
+  /* end it with a newline if the client didn't */
+  if(buffer[len-1] != '\n')  {
+     buffer[len++] = '\n';
+     buffer[len] = '\0';
+  }
+  
+  const char *buf = buffer;
+  ssize_t answer = (ssize_t)len;
+  ssize_t rsz = 0;
+  while(len > 0) { 
+     rsz = write(fd,buf,len);
+     if(rsz < 0) break;
+     len -= rsz;
+     buf += rsz;
+  }
+  
+  return (rsz < 0)  ? rsz : answer; 
+}
+
 
 enum { P_READ, P_WRITE } ;
 
-static void print_hash(size_t bytes, const uint8_t*const hash) {
+static void print_hash(char *buf, size_t bytes, const uint8_t*const hash) {
   for(size_t v = 0; v < bytes; ++v) {
-     printf("%02x",hash[v]);
+     sprintf(buf,"%02x",hash[v]);
+     buf += 2;
   } 
+  *buf = '\0';
 }
 
 static void usage() {
@@ -44,38 +95,36 @@ static void panic(const char*msg) {
  *    send "OK %s" --> print to stdout, and I'm ready for more input
  *    send "ER %s" --> print to stderr, and I'm ready for more input
  */
-static void run_job(int hash_sz) {
-     char fname[384];
+static void run_job(int hash_sz, int readfd, int writefd) {
+     char fname[1024];
+     uint8_t * const hashbuf = malloc(hash_sz * sizeof(uint8_t) + 1);
+     if(hashbuf == NULL) panic("Can't allocate hash buffer!");
 
-     printf("OK\n"); /* request input */
-     fflush(stdout);
+     if(write_line(writefd,"OK") < 0) return;
 
-     while (fgets(fname, sizeof(fname), stdin) != 0)
+     ssize_t flen;
+     while ( (flen = read_line(readfd, fname, sizeof(fname))) > 0 )
      {
         /* chop of the newline */
-	fname[strlen(fname) - 1] = '\0'; 
+	fname[flen - 1] = '\0'; 
 
         FILE *input = fopen(fname,"rb");
-        setvbuf(input, 0, _IONBF, 0);
         if(input != NULL) {
+          setvbuf(input, NULL, _IONBF, 0);
           const uint8_t *const hash = spritz_file_hash(hash_sz,input);
           fclose(input);
 
           if(hash == NULL) {
-            printf("ER <%s> could not hash\n", fname);
-            fflush(stdout);
+            write_line(writefd,"ER Could not hash <%s>", fname);
 	    continue;
 	  }
-	  printf("OK %s: ",fname);
-          print_hash(hash_sz,hash);
-          printf("\n");
-          fflush(stdout);
-          destroy_spritz_hash(hash);
 
-        }
-	else {
-          printf("ERR <%s> BAD FILE\n",fname);
-          fflush(stdout);
+	  print_hash(hashbuf, hash_sz, hash);
+	  write_line(writefd, "OK %s: %s",fname,hashbuf);
+
+          destroy_spritz_hash(hash);
+        } else {
+          write_line(writefd,"ER Could not open <%s>",fname);
         }
      }
 }
@@ -92,15 +141,11 @@ static job* create_jobs(int num, int hash_sz) {
      if((ans[idx].pid = fork()) < 0) panic("Can't fork!");
 
      if(ans[idx].pid == 0) {
-	/* we are the child... set stdin to pipe1 and pipe2 to stdout */
+	/* we are the child... close the unused channels */
         close(pipe1[P_WRITE]);
         close(pipe2[P_READ]);
-        dup2(pipe1[P_READ], STDIN_FILENO);
-        close(pipe1[P_READ]);
-        dup2(pipe2[P_WRITE], STDOUT_FILENO);
-        close(pipe2[P_WRITE]);  
         /* process requests */
-	run_job(hash_sz); 
+	run_job(hash_sz, pipe1[P_READ], pipe2[P_WRITE]); 
 	exit(0);
      } else {
         /* we are the parent... remember the communication channels */
@@ -114,10 +159,10 @@ static job* create_jobs(int num, int hash_sz) {
 }
 
 static int handle_input(int fd){ 
-  char inbuf[512];
+  char inbuf[1024];
   int errs = 0;
 
-  size_t rsz = read(fd,inbuf,512);
+  ssize_t rsz = read_line(fd, inbuf, 1024);
   if(rsz == 0) { return 0; }
   if(rsz < 3) {
      fprintf(stderr,"Processing Error!\n");
@@ -130,15 +175,7 @@ static int handle_input(int fd){
 }
 
 static int serve_file(int fd, const char*fname) {
-  char outbuf[512];
-  strncpy(outbuf,fname,510);
-  size_t flen = strlen(fname);
-  if(flen > 510) return 1;
-  outbuf[flen] = '\n';
-  outbuf[flen+1] = '\0';
-
-  if(write(fd,outbuf,flen+1) < 0) return 1;
-
+  if (write_line(fd, "%s", fname) < 0) return 1;
   return 0;
 }
 
@@ -155,9 +192,13 @@ int main(int argc, char **argv) {
   int c;
   int sz = 32;
   int njobs = 1;
+  int child_mode = 0;
 
-  while ( (c = getopt(argc,argv,"hs:j:")) != -1 ) {
+  while ( (c = getopt(argc,argv,"hs:j:c")) != -1 ) {
      switch(c) {
+     case 'c':
+        child_mode = 1;	
+	break;
      case 'h':
 	usage();
 	break;
@@ -171,6 +212,13 @@ int main(int argc, char **argv) {
 	break;
      } 
   }
+
+  if(child_mode == 1) {
+      if(optind != argc) { usage(); }
+      run_job(sz,0,1);
+      exit(0);
+  }
+
   if(argc <= optind) { usage(); }
 
   /* set up concurrency */
