@@ -97,7 +97,7 @@ static void panic(const char*msg) {
  */
 static void run_job(int hash_sz, int readfd, int writefd) {
      char fname[1024];
-     uint8_t * const hashbuf = malloc(hash_sz * sizeof(uint8_t) + 1);
+     uint8_t * const hashbuf = malloc(2*hash_sz * sizeof(uint8_t) + 1);
      if(hashbuf == NULL) panic("Can't allocate hash buffer!");
 
      if(write_line(writefd,"OK") < 0) return;
