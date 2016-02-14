@@ -5,12 +5,13 @@
 
 #include "spritz.h"
 #include<stdlib.h>
+#include<unistd.h>
 
 #define N 256
 
 struct s_spritz_state {
-	uint8_t i, j, k, z, a, w; 
-	uint8_t mem[N];
+        uint8_t i, j, k, z, a, w; 
+        uint8_t mem[N];
 };
 
 /* creates memory that should be destroyed by
@@ -128,19 +129,33 @@ void spritz_drip_many(spritz_state s, uint8_t* arr, size_t len) {
    }
 }
 
+/* used for encryption/decryption */
+void spritz_xor_many(spritz_state s, uint8_t* arr, size_t len) {
+   uint8_t *const end = arr + len;
+   if(s->a > 0) shuffle(s);
+   while(arr != end) {
+      *arr++ ^= drip_one(s);
+   }
+}
+
 /* returns a hash which must be destroyed by 
  * destroy_hash. 
  */
-uint8_t* spritz_file_hash(uint8_t bytes, FILE *input) {
+uint8_t* spritz_file_hash(int fd, size_t bytes) {
    uint8_t *const ans = malloc(bytes*sizeof(uint8_t));
    uint8_t *const buffer = malloc(4096*sizeof(uint8_t));
    spritz_state s = create_spritz();
   
-   size_t num_read; 
-   while((num_read = fread(buffer, sizeof(uint8_t), 4096, input)) > 0) {
-      spritz_absorb_many(s, buffer, num_read);
+   ssize_t rsz; 
+   while((rsz = read(fd, buffer, 4096)) > 0) {
+      spritz_absorb_many(s, buffer, rsz);
    }
-   if(!feof(input)) { fprintf(stderr,"Problem reading the file!");  }
+
+   if(rsz < 0) {
+           free(ans);
+           free(buffer);
+           return NULL; 
+   }
 
    spritz_absorb_stop(s);
    spritz_absorb(s, bytes);
@@ -153,13 +168,13 @@ uint8_t* spritz_file_hash(uint8_t bytes, FILE *input) {
 /* returns a hash which must be destroyed by 
  * destroy_hash. 
  */
-uint8_t* spritz_string_hash(uint8_t bytes, 
-                            const uint8_t * const str, 
-                            size_t len) {
+uint8_t* spritz_mem_hash(const uint8_t * const mem, 
+                         size_t len,
+                         size_t bytes) {
    uint8_t *const ans = malloc(bytes*sizeof(uint8_t));
    spritz_state s = create_spritz();
 
-   spritz_absorb_many(s,str,len);
+   spritz_absorb_many(s,mem,len);
    spritz_absorb_stop(s);
    spritz_absorb(s, bytes);
 

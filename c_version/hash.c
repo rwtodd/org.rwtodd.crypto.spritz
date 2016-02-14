@@ -13,6 +13,8 @@
 #include<poll.h>
 #include<errno.h>
 #include<stdarg.h>
+#include<sys/stat.h>
+#include<fcntl.h>
 
 /* read unbuffered line from pipes */
 static ssize_t read_line(int fd, char *buf, size_t sz) {
@@ -23,7 +25,7 @@ static ssize_t read_line(int fd, char *buf, size_t sz) {
 
   while((rsz > 0) && (buf[rsz-1] != '\n'))  {
         buf   += rsz;  
-	sz    -= rsz;  
+        sz    -= rsz;  
         rsz = read(fd,buf,sz);
         total += rsz;
   }
@@ -96,7 +98,7 @@ static void panic(const char*msg) {
  *    send "OK %s" --> print to stdout, and I'm ready for more input
  *    send "ER %s" --> print to stderr, and I'm ready for more input
  */
-static void run_job(int hash_sz, int readfd, int writefd) {
+static void run_job(size_t hash_sz, int readfd, int writefd) {
      char fname[1024];
      uint8_t * const hashbuf = malloc(2*hash_sz * sizeof(uint8_t) + 1);
      if(hashbuf == NULL) panic("Can't allocate hash buffer!");
@@ -107,27 +109,28 @@ static void run_job(int hash_sz, int readfd, int writefd) {
      while ( (flen = read_line(readfd, fname, sizeof(fname))) > 0 )
      {
         /* chop of the newline */
-	fname[flen - 1] = '\0'; 
+        fname[flen - 1] = '\0'; 
 
-        FILE *input = fopen(fname,"rb");
-        if(input != NULL) {
-          setvbuf(input, NULL, _IONBF, 0);
-          const uint8_t *const hash = spritz_file_hash(hash_sz,input);
-          fclose(input);
+        int input = open(fname,O_RDONLY);
+        if(input >= 0) {
+          const uint8_t *const hash = spritz_file_hash(input, hash_sz);
+          close(input);
 
           if(hash == NULL) {
             write_line(writefd,"ER Could not hash <%s>", fname);
-	    continue;
-	  }
+            continue;
+          }
 
-	  print_hash(hashbuf, hash_sz, hash);
-	  write_line(writefd, "OK %s: %s",fname,hashbuf);
+          print_hash(hashbuf, hash_sz, hash);
+          write_line(writefd, "OK %s: %s",fname,hashbuf);
 
           destroy_spritz_hash(hash);
         } else {
           write_line(writefd,"ER Could not open <%s>",fname);
         }
      }
+
+     free((void*)hashbuf);
 }
 
 static job* create_jobs(int num, int hash_sz) {
@@ -142,12 +145,12 @@ static job* create_jobs(int num, int hash_sz) {
      if((ans[idx].pid = fork()) < 0) panic("Can't fork!");
 
      if(ans[idx].pid == 0) {
-	/* we are the child... close the unused channels */
+        /* we are the child... close the unused channels */
         close(pipe1[P_WRITE]);
         close(pipe2[P_READ]);
         /* process requests */
-	run_job(hash_sz, pipe1[P_READ], pipe2[P_WRITE]); 
-	exit(0);
+        run_job(hash_sz, pipe1[P_READ], pipe2[P_WRITE]); 
+        exit(0);
      } else {
         /* we are the parent... remember the communication channels */
         close(pipe1[P_READ]);
@@ -198,19 +201,19 @@ int main(int argc, char **argv) {
   while ( (c = getopt(argc,argv,"hs:j:c")) != -1 ) {
      switch(c) {
      case 'c':
-        child_mode = 1;	
-	break;
+        child_mode = 1; 
+        break;
      case 'h':
-	usage();
-	break;
+        usage();
+        break;
      case 'j':
         njobs = atoi(optarg);
         if(njobs < 1) njobs = 1;
-	break;
+        break;
      case 's':
         sz = (atoi(optarg) + 7) / 8;
         if(sz < 1) sz = 1;
-	break;
+        break;
      } 
   }
 
@@ -242,32 +245,32 @@ int main(int argc, char **argv) {
          continue;
      } else if( (num_events < 0) && (errno != EAGAIN) ) {
          fprintf(stderr,"POLL died!\n");
-	 return 1; 
+         return 1; 
      }  
      /* we got at least one readable socket... try to service them */
      int target = 0;
      for(int i = 0; i < njobs ; ++i) {
-	 int ready = pfds[i].revents & (POLLIN|POLLHUP);
+         int ready = pfds[i].revents & (POLLIN|POLLHUP);
          int more  = fname_idx < argc;
-	 if(!ready || more) {
-	     /* keep this fd in the list */
-		 if(target != i) {
+         if(!ready || more) {
+             /* keep this fd in the list */
+                 if(target != i) {
                     pfds[target] = pfds[i];
-		    jobs[target] = jobs[i];
-		 }
-		 target++;
-	 }
+                    jobs[target] = jobs[i];
+                 }
+                 target++;
+         }
 
          if(ready) {
              nerr += handle_input(pfds[i].fd);
              if(more) {
-	         nerr += serve_file(jobs[i].fd_to, argv[fname_idx++]);
+                 nerr += serve_file(jobs[i].fd_to, argv[fname_idx++]);
              } else { 
-		 /* we are out of files... close down the child */
-		 close(jobs[i].fd_to);
-		 close(jobs[i].fd_from);
+                 /* we are out of files... close down the child */
+                 close(jobs[i].fd_to);
+                 close(jobs[i].fd_from);
              }
-	 }
+         }
      }
      njobs = target; 
   }
