@@ -77,6 +77,7 @@ static void usage() {
   fprintf(stderr,"  -h    Display this help message.\n");
   fprintf(stderr,"  -s n  Set the hash size to n bits\n");
   fprintf(stderr,"  -j n  Run n hashes at once.\n");
+  fprintf(stderr,"  -c    Run in interactive child mode\n");
   exit(2);
 }
 
