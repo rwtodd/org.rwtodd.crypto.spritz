@@ -1,5 +1,4 @@
-#ifndef RWT_SPRITZ
-#define RWT_SPRITZ
+#pragma once
 
 #include<stdint.h>
 #include<stdio.h>
@@ -23,4 +22,3 @@ uint8_t* spritz_string_hash(uint8_t bytes,
                             size_t len);
 void destroy_spritz_hash(const uint8_t*const hash);
 
-#endif
