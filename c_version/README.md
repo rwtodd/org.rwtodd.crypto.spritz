@@ -1,5 +1,35 @@
 # C Version
 
+## (2016-02-14) Concurrency Via Fork()
+
+I wanted to see how a concurrent model based on fork would compare
+with my [go version in the other repo](https://github.com/waywardcode/crypto).
+So, tonight I added a `-j` option to the c hasher like _make_ has for 
+how many concurrent jobs to spin up.  I defined a simple
+language for the worker processes to communicate back up the parent (via pipes):
+
+    "OK <msg>" ==> print the msg to stdout and give me more work 
+    "ER <msg>" ==> print this error message, and give me more work
+
+The results, hashing 1.6GB of files took:
+
+    time:   50s for the c version with 8 jobs (-j8)
+    time: 1m23s for the Go version (max procs = 8)
+
+So, the c version is a good bit faster, but I had to work _a lot_ harder at the
+concurrency.  I had to:
+
+  * manually fork off the processes, create the pipes, and hook them up.
+  * devise a protocol for them to speak to each other
+  * implement the protocol, including all the necessary error-handling
+    and buffering
+
+Meanwhile, in Go, converting the serial version to the concurrent version just took a couple
+lines of code. So, on any given project, you have to decide how much performance you are 
+willing to trade for convenience. 
+
+## Original Implementation Notes
+
 I wanted to see how much faster a C version of the hasher would
 be, compared to the java version.  Imagine my surprise that the
 java version is slightly faster!
