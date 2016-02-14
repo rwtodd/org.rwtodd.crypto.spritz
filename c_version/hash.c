@@ -234,8 +234,8 @@ int main(int argc, char **argv) {
   }
 
   /* serve jobs */
-  int idx = optind;
-  while(idx < argc) {
+  int fname_idx = optind;
+  while(njobs > 0) {
      /* poll for available child */
      int num_events = poll(pfds, njobs, -1);
      if(num_events == 0) {
@@ -244,21 +244,36 @@ int main(int argc, char **argv) {
          fprintf(stderr,"POLL died!\n");
 	 return 1; 
      }  
-     /* we got at least one readable socket... try to serve them */
-     for(int j = 0; j < njobs ; ++j) {
-         if(pfds[j].revents & (POLLIN|POLLHUP)) {
-             nerr += handle_input(pfds[j].fd);
-	     nerr += serve_file(jobs[j].fd_to, argv[idx++]);
-	     if(idx == argc) break;
+     /* we got at least one readable socket... try to service them */
+     int target = 0;
+     for(int i = 0; i < njobs ; ++i) {
+	 int ready = pfds[i].revents & (POLLIN|POLLHUP);
+         int more  = fname_idx < argc;
+	 if(!ready || more) {
+	     /* keep this fd in the list */
+		 if(target != i) {
+                    pfds[target] = pfds[i];
+		    jobs[target] = jobs[i];
+		 }
+		 target++;
+	 }
+
+         if(ready) {
+             nerr += handle_input(pfds[i].fd);
+             if(more) {
+	         nerr += serve_file(jobs[i].fd_to, argv[fname_idx++]);
+             } else { 
+		 /* we are out of files... close down the child */
+		 close(jobs[i].fd_to);
+		 close(jobs[i].fd_from);
+             }
 	 }
      }
+     njobs = target; 
   }
 
-  /* now cleanup */
-  for(int j = 0; j < njobs; ++j) {
-     close(jobs[j].fd_to);
-     nerr += handle_input(pfds[j].fd);
+  if(nerr > 0) {
+     fprintf(stderr,"There were %d errors.\n",nerr);
   }
-
   return (nerr==0)?0:1;
 }
