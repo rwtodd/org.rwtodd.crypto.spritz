@@ -1,7 +1,7 @@
 all: libspritz.a spritz-hash.exe spritz-crypt.exe
 
 clean:
-	rm *.o *.a *~ spritz-hash.exe
+	-rm *.o *.a *~ spritz-hash.exe spritz-crypt.exe
 
 libspritz.a: spritz.h spritz.c
 	gcc -std=c11 -O3 -c spritz.c 
