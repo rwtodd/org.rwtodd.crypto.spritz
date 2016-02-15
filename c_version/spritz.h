@@ -1,6 +1,7 @@
 #pragma once
 
 #include<stdint.h>
+#include<unistd.h>
 #include<stdio.h>
 
 struct s_spritz_state; 
@@ -22,4 +23,6 @@ uint8_t* spritz_mem_hash(const uint8_t * const mem,
                          size_t len,
                          size_t bytes);
 void destroy_spritz_hash(const uint8_t*const hash);
+spritz_state spritz_crypt(const uint8_t *pw, size_t pwlen, const uint8_t *iv, size_t ivlen);
+ssize_t spritz_xor_copy(spritz_state s, int tgt_fd, int src_fd);
 

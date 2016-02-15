@@ -187,3 +187,42 @@ void destroy_spritz_hash(const uint8_t*const hash) {
   free((void*)hash);
 }
 
+/* sets up a spritz state suitable for encrypting/decrypting */
+spritz_state spritz_crypt(const uint8_t *pw, size_t pwlen, const uint8_t *iv, size_t ivlen) {
+   spritz_state s = create_spritz();
+
+   spritz_absorb_many(s,pw,pwlen);
+   spritz_absorb_stop(s);
+   spritz_absorb_many(s,iv,ivlen);
+
+   return s;
+}
+
+static ssize_t write_fully(int fd, const uint8_t *buf, size_t len) {
+    ssize_t ans = len;
+    ssize_t sz;
+    while( (sz = write(fd,buf,len)) != len ) {
+      if(sz < 0) { ans = sz; break; }
+      len -= sz; 
+      buf += sz;
+    } 
+   
+    return ans; 
+}
+
+ssize_t spritz_xor_copy(spritz_state s, int tgt_fd, int src_fd) {
+   ssize_t total = 0;
+
+   uint8_t *const buffer = malloc(4096*sizeof(uint8_t));
+
+   ssize_t rsz; 
+   while((rsz = read(src_fd, buffer, 4096)) > 0) {
+      spritz_xor_many(s, buffer, rsz);
+      ssize_t wsz = write_fully(tgt_fd,buffer, rsz);
+      if(wsz != rsz) { rsz = wsz; break; } 
+      total += rsz;
+   }
+
+   free(buffer);
+   return (rsz < 0)?rsz:total;
+}

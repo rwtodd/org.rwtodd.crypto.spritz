@@ -51,7 +51,7 @@ static void panic(const char*msg) {
  *    send "ER %s" --> print to stderr, and I'm ready for more input
  */
 static void run_job(size_t hash_sz, int readfd, int writefd) {
-     char fname[1024];
+     char fname[300];
      uint8_t * const hashbuf = malloc(2*hash_sz * sizeof(uint8_t) + 1);
      if(hashbuf == NULL) panic("Can't allocate hash buffer!");
 
@@ -60,7 +60,7 @@ static void run_job(size_t hash_sz, int readfd, int writefd) {
      ssize_t flen;
      while ( (flen = read_line(readfd, fname, sizeof(fname))) > 0 )
      {
-        /* chop of the newline */
+        /* chop off the newline */
         fname[flen - 1] = '\0'; 
 
         int input = open(fname,O_RDONLY);
