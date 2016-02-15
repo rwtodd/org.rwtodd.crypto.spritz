@@ -19,12 +19,6 @@ const size_t extlen = 7;
 /* a global copy of the hashed pw */
 uint8_t *pw_hash = NULL; 
 
-static void process_password(const char *pw) {
-  size_t len = strlen(pw); 
-  pw_hash = spritz_mem_hash(pw, len, 32);
-
-}
-
 /* generate bytes of random data */
 static void gen_rdata(uint8_t *buf, size_t len) {
    for(size_t i = 0; i < len; ++i) {
@@ -134,7 +128,7 @@ typedef struct job {
 } job;
 
 static void panic(const char*msg) {
-  fprintf(stderr,msg);
+  fputs(msg,stderr);
   exit(1);
 }
 
@@ -268,7 +262,7 @@ int main(int argc, char **argv) {
         break;
      case 'p':
         pwlen = strlen(optarg); 
-        pw_hash = spritz_mem_hash(optarg, pwlen, 32);
+        pw_hash = spritz_mem_hash((const uint8_t *)optarg, pwlen, 32);
         break;
      } 
   }

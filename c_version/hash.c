@@ -42,7 +42,7 @@ typedef struct job {
 } job;
 
 static void panic(const char*msg) {
-  fprintf(stderr,msg);
+  fputs(msg,stderr);
   exit(1);
 }
 
@@ -52,7 +52,7 @@ static void panic(const char*msg) {
  */
 static void run_job(size_t hash_sz, int readfd, int writefd) {
      char fname[300];
-     uint8_t * const hashbuf = malloc(2*hash_sz * sizeof(uint8_t) + 1);
+     char * const hashbuf = malloc(2*hash_sz * sizeof(uint8_t) + 1);
      if(hashbuf == NULL) panic("Can't allocate hash buffer!");
 
      if(write_line(writefd,"OK") < 0) return;
