@@ -1,79 +1,58 @@
 # spritz cipher
 
-Implementations of the Spritz sponge-like stream cipher in
-`scala`, `java`, `go`, `c`, `forth`, `c++`, and `f#` (in that order).  
-The `java` and `scala` 
-versions have both hashing and encryption convenience 
-functions. The others have the full algorithm but 
-are only set up to help you hash. 
+In this repository, you will find several implementations of
+the spritz cipher (described [in RS14.pdf][1]).  Every implementation
+is sufficient to compute a hash of file contents, and some of them
+can also encrypt and decrypt files.
 
+The three most mature implementations are:
 
-## Story
+  * __C__: This is the fastest implementation. I'm also very happy
+  with the fork()+pipes concurrency model. It spawns worker processes
+  to do the actual hashing and encryption, using a simple text 
+  protocol to communicate with the workers.
 
-I read about this fun cipher [here (RS14.pdf)][1], and
-decided to implement it in scala.  After that, I converted it
-to java to compare the two.  Here's what I found:
+  * __Go__: The go implementation in this repo is just a hasher, but
+  I have a full-featured implementation for both the hash and the
+  encryption cipher in [my spritz_go repo][2]. The one here was
+  just a speed test/prototype.  It processes the files concurrently,
+  of course!
 
-  * The java source and scala source were roughly the same size
-  * `javac` produced 1 class file (4kb), while `scalac` produced
-     11 class files (24kb).
+  * __Java__: Java was the second impementation I did, and it has a
+  hasher and encryptor. It uses JKD8 streams and the fork/join pool
+  for concurrency.  It provides the encryption/decryption as stream
+  wrappers, which is very nice.
 
-I decided to stick with the java version!
+   * __scala__: Scala was the first implementation, when I was
+   briefly in love with the language and looking for projects
+   to try it out on.  This has a hasher and encryptor, but I didn't
+   make these concurrent.  It's interesting to compare it to the
+   java version, since `val x` is so much more compact than `final int x`.
+   This was some of my first scala code, and I'm sure it has many
+   warts.
 
-_Edit 2015-08-15_: I also implemented enough to do hashing in golang. Check
-out the `go_version` subdirectory's README.md to see how that went!  Spoiler
-alert: the coding was great but it ran at half speed compared to scala.
+The implementations that are just hashers are mainly to compare the
+way the implementation looks, and to see how they compare, speed-wise.
 
-_Edit: 2015-08-25_: I made a C version to see how much it would 
-trounce the java version. Surprise: the java was faster!  A couple
-weeks later I looked at it and found an optimization that makes
-C the speed king again.  See the README in the c_version directory.
+  * __Forth__: Like all forth, it's a compact, fun program, and a 
+  labor of love.  Depending on which forth you run it on, it is 
+  respectably fast.
 
-_Edit: 2015-09-12_: I made a forth version. On interpreted gforth
-it runs about 4.8 times slower than java. But it was fun to write!
-When I compile it with MPE Forth, it's about 1.4x slower than
-the java. Much more respectable.
+  * __F#__: I was very impressed with how tiny the program came out.
+  This is one of a handful of F# programs I've written, and they
+  all remind me of O'Caml.  It uses parallel streams for concurrency.
 
-_Edit: 2015-09-13_: I converted the C to C++ because I wanted
-to see if I could feel a productivity difference using iterators
-for everything.  My findings are in the readme in that directory.
+  * __C++__: This hasher was built from a version of the C code. I
+  was pleased with how small I could make the public surface of the
+  class, and also how templates+iterators enabled the user to hash
+  just about any sequence they could dream up.  There really is
+  something to be said for the STL design. However, the prospect
+  of trying to build encryption into a custom `istream` or `ostream`
+  makes my stomach turn. `iostreams` are an unfortunate mistake in
+  C++'s history.
 
-_Edit: 2015-12-14_: I made an fsharp version of the hasher, which
-computes multiple hashes in parallel. It runs about as fast as the
-java version. Very impressive, especially since the code is so short!
+There are README files in the subdirectories with a little more information
 
-About the Java Version
-----------------------
-
-The class has all the 
-methods in the PDF spec, and exposes the ones like
-`absorb` and `squeeze` that are used to encrypt, decrypt,
-and hash.
-
-The provided static methods are intended to
-cover the simple cases. It can compute hashes, and encrypt
-or decrypt a stream.
-
-```
-// get a 256-bit hash of some bytes
-byte[]  hash = SpritzCipher.hash(256, inbytes)
-
-// encrypt a stream 
-SpritzCipher.encrypt(password, instream, outstream)
-
-// decrypt a stream
-SpritzCipher.decrypt(password, instream, outstream)
-```
-
-I made command-line programs for hashing and encrypting. 
-
-```
-> java rwt.spritz.Hash *.scala
-spritz.scala: c24f02ce8c65f86cc61dbbf486803f5ff7c93e2c2201037c5e99c1421706eeae
-spritz_crypt.scala: d9e3ae2e8ab2c869149304323920301216a7e688ada88d9350816260e7f35bde
-spritz_hash.scala: 71aa2708801ec8756765bbebe1bfcac41f669b4df811bfa84e0c05dcf351b09a
-
-> java rwt.spritz.Crypt <<password>> file1 file2
-```
-
+about each implementation.
 [1]: http://people.csail.mit.edu/rivest/pubs/RS14.pdf
+[2]: https://github.com/waywardcode/spritz_go
