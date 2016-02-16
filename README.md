@@ -23,13 +23,13 @@ The three most mature implementations are:
   for concurrency.  It provides the encryption/decryption as stream
   wrappers, which is very nice.
 
-   * __scala__: Scala was the first implementation, when I was
-   briefly in love with the language and looking for projects
-   to try it out on.  This has a hasher and encryptor, but I didn't
-   make these concurrent.  It's interesting to compare it to the
-   java version, since `val x` is so much more compact than `final int x`.
-   This was some of my first scala code, and I'm sure it has many
-   warts.
+  * __scala__: Scala was the first implementation, when I was
+  briefly in love with the language and looking for projects
+  to try it out on.  This has a hasher and encryptor, but I didn't
+  make these concurrent.  It's interesting to compare it to the
+  java version, since `val x` is so much more compact than `final int x`.
+  This was some of my first scala code, and I'm sure it has many
+  warts.
 
 The implementations that are just hashers are mainly to compare the
 way the implementation looks, and to see how they compare, speed-wise.
