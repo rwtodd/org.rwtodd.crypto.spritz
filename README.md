@@ -23,6 +23,10 @@ The three most mature implementations are:
   for concurrency.  It provides the encryption/decryption as stream
   wrappers, which is very nice.
 
+The implementations--mostly just hashers--are mainly written to compare 
+the way the implementations look, how hard they were to write, and
+how fast the resulting program run.
+
   * __scala__: Scala was the first implementation, when I was
   briefly in love with the language and looking for projects
   to try it out on.  This has a hasher and encryptor, but I didn't
@@ -30,9 +34,6 @@ The three most mature implementations are:
   java version, since `val x` is so much more compact than `final int x`.
   This was some of my first scala code, and I'm sure it has many
   warts.
-
-The implementations that are just hashers are mainly to compare the
-way the implementation looks, and to see how they compare, speed-wise.
 
   * __Forth__: Like all forth, it's a compact, fun program, and a 
   labor of love.  Depending on which forth you run it on, it is 
