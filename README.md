@@ -23,9 +23,9 @@ The three most mature implementations are:
   for concurrency.  It provides the encryption/decryption as stream
   wrappers, which is very nice.
 
-The implementations--mostly just hashers--are mainly written to compare 
-the way the implementations look, how hard they were to write, and
-how fast the resulting program run.
+The rest of the implementations--mostly just hashers--are mainly written 
+to compare the way they look, how hard they were to write, and
+how fast the resulting programs run.
 
   * __scala__: Scala was the first implementation, when I was
   briefly in love with the language and looking for projects
