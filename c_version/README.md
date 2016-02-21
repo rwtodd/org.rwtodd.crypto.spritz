@@ -38,7 +38,7 @@ It's easy to test the C code by hand on the terminal, which is a plus.
 ## (2016-02-14) Concurrency Via Fork()
 
 I wanted to see how a concurrent model based on fork would compare
-with my [go version in the other repo](https://github.com/waywardcode/crypto).
+with my [go version in the other repo](https://github.com/waywardcode/spritz_go).
 So, tonight I added a `-j` option to the c hasher like _make_ has for 
 how many concurrent jobs to spin up.  I defined a simple
 language for the worker processes to communicate back up the parent (via pipes):
