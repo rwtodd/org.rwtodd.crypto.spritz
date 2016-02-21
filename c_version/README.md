@@ -1,5 +1,40 @@
 # C Version
 
+## (2016-02-21) Concurrency Via Perl Script
+
+In keeping with Unix philosophy, I separated concerns into a 
+perl front-end and a C back-end. Compared to the pure C fork()-ing
+version I had before, the code is much simpler and performance 
+is the same.
+
+With this design, a user of the code has several options:
+
+  * Call/modify the perl script
+  * Run the C binary, speak its simple textual language
+  * Link to the `libspritz` library, call on the functionality
+
+I believe this design offers the best of all worlds:
+
+  * Easy to change surface details of the UI via perl/python/whatever
+  * Fast processing spread across a cores in a process pool
+  * More straightforward C code, complexity pushed out to a script 
+
+One downside to this approach: now there's a dependency on perl if you want 
+to run the default font-end. However, the previous all-C version used
+POSIX calls, and if you have POSIX you probably have access to perl. 
+
+As before, the parent (perl) sends simple commands to the worker (C) process. For
+example, a command to encrypt looks like:
+
+    "E file.txt file.txt.spritz"
+
+... and if the encryption goes well, the the worker responds:
+
+    "OK file.txt -encrypt-> file.txt.spritz"
+
+It's easy to test the C code by hand on the terminal, which is a plus.
+
+
 ## (2016-02-14) Concurrency Via Fork()
 
 I wanted to see how a concurrent model based on fork would compare
