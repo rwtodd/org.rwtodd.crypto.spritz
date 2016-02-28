@@ -287,18 +287,20 @@ int main(int argc, char **argv)
     }
     srand(time(NULL));
 
-    int errcnt = 0;
+    int err = 0;		/* track errors */
     if ((optind >= argc) ||
 	((argc - optind == 1) && (!strcmp(argv[optind], "-")))
 	) {
-	errcnt += proc(pw_hash, "-", "-");
+	err += proc(pw_hash, "-", "-");
     } else {
 	for (int idx = optind; idx < argc; ++idx) {
 	    const char *tgt =
 		determine_target(proc == encrypt_file, odir, argv[idx]);
-	    if (tgt == NULL)
+	    if (tgt == NULL) {
+		err += -1;
 		continue;
-	    errcnt += proc(pw_hash, argv[idx], tgt);
+	    }
+	    err += proc(pw_hash, argv[idx], tgt);
 	    free((void *) tgt);
 	}
     }
@@ -306,5 +308,5 @@ int main(int argc, char **argv)
     /* cleanup, although not necessary since we're exiting */
     destroy_spritz_hash(pw_hash);
     free(odir);
-    return (errcnt == 0) ? 0 : 1;
+    return (err < 0);
 }
