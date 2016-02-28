@@ -16,6 +16,10 @@ static void gen_rdata(uint8_t * buf, size_t len)
     }
 }
 
+/* maybe_open: A wrapper for open().  If the filename isnt "-", open 
+ * filename. Otherwise, return 0 (stdin) of 1 (stdout) based on the 
+ * 'flags`.
+ */
 static int maybe_open(const char *const fname, int flags, mode_t mode)
 {
     int reading = (flags == O_RDONLY);
@@ -26,123 +30,125 @@ static int maybe_open(const char *const fname, int flags, mode_t mode)
     return reading ? open(fname, flags) : open(fname, flags, mode);
 }
 
-typedef int (*processor) (const uint8_t * const, const char *,
-			  const char *);
+/* processor, the type that can either be an encryptor or decryptor */
+typedef int (*processor) (const uint8_t * const pw_hash, const char *src,
+			  const char *tgt);
 
+/* decrypt_file: decrypt 'src' against password 'pw_hash', writing
+ * the output to 'tgt'
+ */
 static int decrypt_file(const uint8_t * const pw_hash, const char *src,
 			const char *tgt)
 {
-    int result = 1;
-    uint8_t buf[12];		// IV, random data, hash of random data
+    int result = -1;
+    uint8_t buf[12];		/* IV, random data, hash of random data */
 
-    int srcfd = maybe_open(src, O_RDONLY, 0);
-    if (srcfd < 0)
-	goto exit;
+    int srcfd = -1, tgtfd = -1;
+    uint8_t *rhash = NULL;
 
-    int tgtfd = maybe_open(tgt, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (tgtfd < 0) {
-	close(srcfd);
-	goto exit;
+    if ((srcfd = maybe_open(src, O_RDONLY, 0)) < 0 ||
+	(tgtfd =
+	 maybe_open(tgt, O_WRONLY | O_CREAT | O_TRUNC, 0666)) < 0) {
+	fprintf(stderr, "%s error: Failed to open input or output file!\n",
+		src);
+	goto cleanup;
     }
 
     /* read the IV, rdata, and hashed rdata */
-    if (read(srcfd, buf, 12) != 12)
-	goto err_exit;
-
-    spritz_state ss = spritz_crypt(pw_hash, 32, buf, 4);
+    if (read(srcfd, buf, 12) != 12) {
+	fprintf(stderr, "%s Can't read IV!\n", src);
+	goto cleanup;
+    }
 
     /* now decrypt the random data and its hash... */
+    spritz_state ss = spritz_crypt(pw_hash, 32, buf, 4);
     spritz_xor_many(ss, buf + 4, 8);
-    uint8_t *rhash = spritz_mem_hash(buf + 4, 4, 4);
-    if (rhash == NULL)
-	goto err_exit2;
+    if ((rhash = spritz_mem_hash(buf + 4, 4, 4)) == NULL) {
+	fprintf(stderr, "%s error: Can't hash!\n", src);
+	goto cleanup2;
+    }
+
     if (memcmp(rhash, buf + 8, 4) != 0) {
-	result = 2;
-	goto err_exit2;
+	fprintf(stderr, "%s: Bad password or corrupt file!\n", src);
+	goto cleanup2;
     }
 
     /* ok, looks like the password was right... now decrypt */
-    if (spritz_xor_copy(ss, tgtfd, srcfd) < 0)
-	goto err_exit2;
+    if (spritz_xor_copy(ss, tgtfd, srcfd) < 0) {
+	fprintf(stderr, "%s: Decryption error!\n", src);
+	goto cleanup2;
+    }
 
-    result = 0;			/* no errors! */
+    /* no errors! */
+    result = 0;
+    if (tgtfd != 1)
+	printf("%s -decrypt-> %s\n", src, tgt);
 
-  err_exit2:
+  cleanup2:
     if (ss != NULL)
 	destroy_spritz(ss);
-  err_exit:
+  cleanup:
     if (rhash != NULL)
 	destroy_spritz_hash(rhash);
-    close(tgtfd);
-    close(srcfd);
-  exit:
-    switch (result) {
-    case 0:
-	if (tgtfd != 1)
-	    printf("%s -decrypt-> %s\n", src, tgt);
-	break;
-    case 2:
-	fprintf(stderr, "%s: bad password or corrupt file!\n", src);
-	break;
-    default:
-	fprintf(stderr, "%s: error decrypting.\n", src);
-    }
-    return (result != 0);
+    if (tgtfd >= 0)
+	close(tgtfd);
+    if (srcfd >= 0)
+	close(srcfd);
+    return result;
 }
 
 
+/* encrypt_file: encrypt 'src' against password 'pw_hash', writing
+ * the output to 'tgt'
+ */
 static int encrypt_file(const uint8_t * const pw_hash, const char *src,
 			const char *tgt)
 {
     int result = 1;
-    uint8_t buf[12];		// IV, random data, hash of random data
+    uint8_t buf[12];		/* IV, random data, hash of random data */
+    int srcfd = -1, tgtfd = -1;
+
     gen_rdata(buf, 8);
-    uint8_t *rhash = spritz_mem_hash(buf + 4, 4, 4);
-    if (rhash == NULL)
-	goto exit;
+
+    uint8_t *rhash = NULL;
+    if ((rhash = spritz_mem_hash(buf + 4, 4, 4)) == NULL) {
+	fprintf(stderr, "%s error: Can't hash!\n", src);
+	goto cleanup;
+    }
+
     memcpy(buf + 8, rhash, 4);
     destroy_spritz_hash(rhash);
 
-    int srcfd = maybe_open(src, O_RDONLY, 0);
-    if (srcfd < 0)
-	goto exit;
-
-    int tgtfd = maybe_open(tgt, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (tgtfd < 0) {
-	close(srcfd);
-	goto exit;
+    if ((srcfd = maybe_open(src, O_RDONLY, 0)) < 0 ||
+	(tgtfd =
+	 maybe_open(tgt, O_WRONLY | O_CREAT | O_TRUNC, 0666)) < 0) {
+	fprintf(stderr, "%s error: Failed to open input or output file!\n",
+		src);
+	goto cleanup;
     }
 
-    /* write the IV unencrypted */
-    if (write(tgtfd, buf, 4) != 4)
-	goto err_exit;
-
+    /* now encrypt and write out the file... */
     spritz_state ss = spritz_crypt(pw_hash, 32, buf, 4);
-
-    /* now encrypt the random data and its hash... */
     spritz_xor_many(ss, buf + 4, 8);
-    if (write(tgtfd, buf + 4, 8) != 8)
-	goto err_exit2;
+    if (write(tgtfd, buf, 12) != 12 ||
+	spritz_xor_copy(ss, tgtfd, srcfd) < 0) {
+	fprintf(stderr, "%s error: Failed to write!\n", tgt);
+	goto cleanup2;
+    }
 
-    /* now copy the input to the output, xoring it... */
-    if (spritz_xor_copy(ss, tgtfd, srcfd) < 0)
-	goto err_exit2;
+    /* no errors! */
+    result = 0;
+    if (tgtfd != 1)
+	printf("%s -encrypt-> %s\n", src, tgt);
 
-    result = 0;			/* no errors! */
-
-  err_exit2:
+  cleanup2:
     if (ss != NULL)
 	destroy_spritz(ss);
-  err_exit:
-    close(tgtfd);
-    close(srcfd);
-  exit:
-    if (result == 0) {
-	if (tgtfd != 1)
-	    printf("%s -encrypt-> %s\n", src, tgt);
-    } else {
-	fprintf(stderr, "%s: error encrypting.\n", src);
-    }
+  cleanup:
+    if (tgtfd >= 0)
+	close(tgtfd);
+    if (srcfd >= 0)
+	close(srcfd);
     return result;
 }
 
@@ -156,68 +162,74 @@ static void usage()
     exit(2);
 }
 
+/* basename: from path 'src', return the basename
+ * as a pointer into the same memory as 'src'
+ */
 static const char *basename(const char *src)
 {
-    const char *answer = strrchr(src, '/');
-    if (answer == NULL)
-	answer = src;
+    const char *bn = strrchr(src, '/');
+    if (bn == NULL)
+	bn = src;
     else
-	++answer;		/* go past the '/' we found */
-    return answer;
+	++bn;			/* go past the '/' we found */
+    return bn;
 }
 
+/* determine_target: allocates and creates a target filename from
+ * the 'src' filename, an output directory 'odir', and a flag telling
+ * whether we are 'encrypting' or not.
+ */
 static char *determine_target(int encrypting, const char *odir,
 			      const char *src)
 {
     static const char *extension = ".spritz";
     static const char *unenc = ".unenc";
-    char *answer = NULL;
-    size_t anslen = 0;
+    char *tgt = NULL;		/* the target filename */
+    size_t tgtlen = 0;		/* the needed length of tgt */
     size_t odirlen = 0;
     size_t srclen = 0;
 
     /* First, determine the max space needed */
-    if (odir == NULL) {
-	/* just get 7 extra characters, in case we need to add a suffix */
-	srclen = strlen(src);
-	anslen = srclen + 7;
-    } else {
-	/* we have to find the basename */
-	src = basename(src);
-	srclen = strlen(src);
+    if (odir != NULL) {
 	odirlen = strlen(odir);
-
-	/* +7 is for a suffix */
-	anslen = odirlen + srclen + 7;
+	src = basename(src);
     }
+
+    /* just get 7 extra characters, in case we 
+     * need to add a suffix, plus another for
+     * the '\0'
+     */
+    srclen = strlen(src);
+    tgtlen = odirlen + srclen + 7 + 1;
 
     /* Second, allocate and copy the filename */
-    answer = malloc(anslen * sizeof(char));
-    if (answer == NULL)
+    if ((tgt = malloc(tgtlen * sizeof(char))) == NULL) {
+	fprintf(stderr, "%s: failed to allocate memory!\n", src);
 	return NULL;
-
-    char *tgt = answer;
-    if (odir != NULL) {
-	strcpy(tgt, odir);
-	tgt += odirlen;
     }
-    strcpy(tgt, src);
-    tgt += srclen;
+
+    char *loc = tgt;
+    if (odir != NULL) {
+	strcpy(loc, odir);
+	loc += odirlen;
+    }
+    strcpy(loc, src);
+    loc += srclen;
 
     /* Third, determine the suffix */
     if (encrypting) {
 	/* encrypting: add spritz */
-	strcpy(tgt, extension);
+	strcpy(loc, extension);
     } else {
 	/* decrypting: remove a ".spritz" ending, if it's there */
-	if ((tgt - answer > 7) && (!strcmp(tgt - 7, extension))) {
-	    *(tgt - 7) = '\0';
+	if ((loc - tgt > 7) && (!strcmp(loc - 7, extension))) {
+	    *(loc - 7) = '\0';
 	} else {
-	    strcpy(tgt, unenc);
+	    strcpy(loc, unenc);
 	}
     }
 
-    return answer;
+    return tgt;
 }
 
 int main(int argc, char **argv)
@@ -284,6 +296,8 @@ int main(int argc, char **argv)
 	for (int idx = optind; idx < argc; ++idx) {
 	    const char *tgt =
 		determine_target(proc == encrypt_file, odir, argv[idx]);
+	    if (tgt == NULL)
+		continue;
 	    errcnt += proc(pw_hash, argv[idx], tgt);
 	    free((void *) tgt);
 	}

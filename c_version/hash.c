@@ -14,39 +14,51 @@ static void usage()
     exit(2);
 }
 
-static inline void print_hash(size_t bytes, const uint8_t * const hash)
+/* print_hash: prints a given hash as a series of bytes */
+static inline void print_hash(size_t sz, const uint8_t * const h)
 {
-    for (size_t v = 0; v < bytes; ++v) {
-	printf("%02x", hash[v]);
+    for (size_t i = 0; i < sz; ++i) {
+	printf("%02x", h[i]);
     }
 }
 
-static int hash_fd(size_t hash_sz, const char *const fname, int fd)
+/* maybe_open: A wrapper for open().  If the filename isnt "-", open 
+ * filename. Otherwise, return 0 (stdin) of 1 (stdout) based on the 
+ * 'flags`.
+ */
+static int maybe_open(const char *const fname, int flags, mode_t mode)
 {
-    const uint8_t *const hash = spritz_file_hash(fd, hash_sz);
+    int reading = (flags == O_RDONLY);
+    if (!strcmp(fname, "-")) {
+	return reading ? 0 : 1;	/* stdin:stdout */
+    }
+
+    return reading ? open(fname, flags) : open(fname, flags, mode);
+}
+
+/* hash_fname: conpute the hash, size 'sz', of the file 'fname' */
+static int hash_fname(size_t sz, const char *const fname)
+{
+    int fd = maybe_open(fname, O_RDONLY, 0);
+    if (fd < 0) {
+	fprintf(stderr, "ERROR Could not open <%s>\n", fname);
+	return fd;
+    }
+
+    const uint8_t *const hash = spritz_file_hash(fd, sz);
     close(fd);
 
     if (hash == NULL) {
 	fprintf(stderr, "ERROR Could not hash <%s>\n", fname);
-	return 1;
+	return -1;
     }
 
     printf("%s: ", fname);
-    print_hash(hash_sz, hash);
+    print_hash(sz, hash);
     putchar('\n');
 
     destroy_spritz_hash(hash);
-    return 0;			/* no errors */
-}
-
-static int hash_fname(size_t hash_sz, const char *const fname)
-{
-    int input = open(fname, O_RDONLY);
-    if (input < 0) {
-	fprintf(stderr, "ERROR Could not open <%s>\n", fname);
-	return 1;
-    }
-    return hash_fd(hash_sz, fname, input);
+    return 0;
 }
 
 int main(int argc, char **argv)
@@ -68,15 +80,14 @@ int main(int argc, char **argv)
 	}
     }
 
-    int errcnt = 0;
-    if ((optind >= argc) ||
-	((argc - optind == 1) && (!strcmp(argv[optind], "-")))
-	) {
-	errcnt += hash_fd((size_t) sz, "-", 0);
+    /* run the hashes */
+    int err = 0;		/* track errors */
+    if (optind >= argc) {
+	err += hash_fname((size_t) sz, "-");
     } else {
 	for (int idx = optind; idx < argc; ++idx) {
-	    errcnt += hash_fname((size_t) sz, argv[idx]);
+	    err += hash_fname((size_t) sz, argv[idx]);
 	}
     }
-    return (errcnt > 0);
+    return (err < 0);
 }

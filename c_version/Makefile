@@ -9,6 +9,8 @@ libspritz.a: spritz.h spritz.c
 
 spritz-crypt.exe: spritz.h crypt.c  libspritz.a
 	gcc -std=c11 -O3 crypt.c  -L. -lspritz -o spritz-crypt
+	strip spritz-crypt.exe
 
 spritz-hash.exe: spritz.h hash.c libspritz.a
 	gcc -std=c11 -O3 hash.c  -L. -lspritz -o spritz-hash
+	strip spritz-hash.exe
