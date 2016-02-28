@@ -1,5 +1,8 @@
 #!/usr/bin/perl
 
+# ******************************************************************
+# distribute.pl -- distribute work acrosss worker processes
+# ******************************************************************
 use v5.020;
 use Getopt::Std;
 

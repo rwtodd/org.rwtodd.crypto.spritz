@@ -16,10 +16,15 @@ same number of files and hopes for the best.  I think that's
 sufficient for a problem like this one... the previous solutions were
 fun but overkill.  
 
-Also, the distribute.pl script is a general tool, that could be useful
-in many contexts.  I might extend it with a flag that tells it to count
-the size of the input files, and try to distribute equal size, rather 
-than equal numbers of files.
+Here's a command to hash an entire directory tree, spreading the work
+across 3 processes:
+
+    find . -type f | xargs distribute.pl -j3 -p'spritz-hash -s128' 
+
+As you can see, the distribute.pl script is a general tool, that 
+could be useful in many contexts.  I might extend it with a flag that 
+tells it to count the size of the input files, and try to distribute 
+equal size, rather than equal numbers of files.
 
 ## (2016-02-21) Concurrency Via Perl Script
 
@@ -141,4 +146,5 @@ back into the state structure until it's done with all the iterations.
 With that change, the C version takes 54 seconds against java's 60. Still
 not a big win for C... and I chalk that up to my naive use of `fread`
 vs. java's probably much more optimized I/O.  
+
 

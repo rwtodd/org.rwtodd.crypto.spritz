@@ -7,10 +7,11 @@ can also encrypt and decrypt files.
 
 The three most mature implementations are:
 
-  * __C__: This is the fastest implementation. I'm also very happy
-  with the fork()+pipes concurrency model. It spawns worker processes
-  to do the actual hashing and encryption, using a simple text 
-  protocol to communicate with the workers.
+  * __C__: This is the fastest implementation.  It has gone through
+  a number of iterations, you can see in the repo history.  Currently,
+  it uses a perl wrapper to provide concurrency when needed.  In the
+  past, it did the `fork()/poll()` process pool itself, but the 
+  wrapper script makes all the individual pieces simpler.
 
   * __Go__: The go implementation in this repo is just a hasher, but
   I have a full-featured implementation for both the hash and the
