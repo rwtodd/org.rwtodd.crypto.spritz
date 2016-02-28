@@ -1,5 +1,26 @@
 # C Version
 
+## (2016-02-27) Concurrency Via Perl Script, v2
+
+I decided my previous two versions (creating a server/client model
+via fork/exec) were more complicated than the situation warranted.
+So, while they worked well and will live forever in this repo's history,
+I decided to simplify them.
+
+I've made spritz-crypt and spritz-hash both single-threaded, single-process
+commands, and provided a perl script that can launch multiple copies of
+them and distribute the inputs between them.  Unlike the previous 
+solutions, the perl script doesn't monitor the workers via `poll` and
+feed them on demand.  Instead, it tries to give all the workers about the
+same number of files and hopes for the best.  I think that's
+sufficient for a problem like this one... the previous solutions were
+fun but overkill.  
+
+Also, the distribute.pl script is a general tool, that could be useful
+in many contexts.  I might extend it with a flag that tells it to count
+the size of the input files, and try to distribute equal size, rather 
+than equal numbers of files.
+
 ## (2016-02-21) Concurrency Via Perl Script
 
 In keeping with Unix philosophy, I separated concerns into a 
