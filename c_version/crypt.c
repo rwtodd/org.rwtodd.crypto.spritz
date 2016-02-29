@@ -254,21 +254,21 @@ int main(int argc, char **argv)
 		fputs("Multiple -o arguments not allowed!\n", stderr);
 		exit(1);
 	    }
-	    len = strlen(optarg) + 1;
+	    len = strlen(optarg);
 	    if (len >= 256) {
 		fputs("-o argument too long!\n", stderr);
 		exit(1);
 	    }
-	    odir = malloc(len * sizeof(char));
+	    odir = malloc((len + 2) * sizeof(char));	/* +2 for '/', '\0' */
 	    if (odir == NULL) {
 		fputs("No memory!\n", stderr);
 		exit(1);
 	    }
 	    strcpy(odir, optarg);
-	    if (odir[len - 2] != '/') {
+	    if (odir[len - 1] != '/') {
 		/* add a final slash if needed */
-		odir[len - 1] = '/';
-		odir[len] = '\0';
+		odir[len] = '/';
+		odir[len + 1] = '\0';
 	    }
 	    break;
 	case 'p':
