@@ -1,16 +1,39 @@
 all: libspritz.a spritz-hash.exe spritz-crypt.exe
 
+# Change this to affect where stuff gets installed...
+PREFIX=${HOME}
+
+# if your commands are somewhere wierd or not on the path,
+# then set these variables...
+CC=gcc
+AR=ar
+STRIP=strip
+MKDIR=mkdir
+MV=mv
+CP=cp
+RM=rm
+
 clean:
-	-rm *.o *.a *~ spritz-hash.exe spritz-crypt.exe
+	-${RM} *.o *.a *~ spritz-hash.exe spritz-crypt.exe
+
+install: all
+	${MKDIR} -p ${PREFIX}/bin
+	${MV} spritz-hash.exe spritz-crypt.exe ${PREFIX}/bin
+	${MKDIR} -p ${PREFIX}/lib
+	${MV} libspritz.a ${PREFIX}/lib
+	${MKDIR} -p ${PREFIX}/include
+	${CP} spritz.h ${PREFIX}/include
+	${MKDIR} -p ${PREFIX}/man/man1
+	${CP} spritz-hash.1 ${PREFIX}/man/man1
 
 libspritz.a: spritz.h spritz.c
-	gcc -std=c11 -O3 -c spritz.c 
-	ar -r libspritz.a spritz.o
+	${CC} -std=c11 -O3 -c spritz.c 
+	${AR} -r libspritz.a spritz.o
 
 spritz-crypt.exe: spritz.h crypt.c  libspritz.a
-	gcc -std=c11 -O3 crypt.c  -L. -lspritz -o spritz-crypt
-	strip spritz-crypt.exe
+	${CC} -std=c11 -O3 crypt.c  -L. -lspritz -o spritz-crypt
+	${STRIP} spritz-crypt.exe
 
 spritz-hash.exe: spritz.h hash.c libspritz.a
-	gcc -std=c11 -O3 hash.c  -L. -lspritz -o spritz-hash
-	strip spritz-hash.exe
+	${CC} -std=c11 -O3 hash.c  -L. -lspritz -o spritz-hash
+	${STRIP} spritz-hash.exe
