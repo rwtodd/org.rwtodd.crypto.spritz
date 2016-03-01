@@ -27,7 +27,7 @@ install: all
 	${MKDIR} -p ${PREFIX}/include
 	${CP} spritz.h ${PREFIX}/include
 	${MKDIR} -p ${PREFIX}/man/man1
-	${CP} spritz-hash.1 ${PREFIX}/man/man1
+	${CP} spritz-crypt.1 spritz-hash.1 ${PREFIX}/man/man1
 
 libspritz.a: spritz.h spritz.c
 	${CC} ${CCOPT} -c spritz.c 
