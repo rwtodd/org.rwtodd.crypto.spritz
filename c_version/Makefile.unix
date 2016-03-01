@@ -13,6 +13,9 @@ MV=mv
 CP=cp
 RM=rm
 
+# Change this to adjust build options
+CCOPT=-std=c11 -march=native -O3
+
 clean:
 	-${RM} *.o *.a *~ spritz-hash spritz-crypt
 
@@ -27,13 +30,13 @@ install: all
 	${CP} spritz-hash.1 ${PREFIX}/man/man1
 
 libspritz.a: spritz.h spritz.c
-	${CC} -std=c11 -O3 -c spritz.c 
+	${CC} ${CCOPT} -c spritz.c 
 	${AR} -r libspritz.a spritz.o
 
 spritz-crypt: spritz.h crypt.c  libspritz.a
-	${CC} -std=c11 -O3 crypt.c  -L. -lspritz -o spritz-crypt
+	${CC} ${CCOPT} crypt.c  -L. -lspritz -o spritz-crypt
 	${STRIP} spritz-crypt
 
 spritz-hash: spritz.h hash.c libspritz.a
-	${CC} -std=c11 -O3 hash.c  -L. -lspritz -o spritz-hash
+	${CC} ${CCOPT} hash.c  -L. -lspritz -o spritz-hash
 	${STRIP} spritz-hash
