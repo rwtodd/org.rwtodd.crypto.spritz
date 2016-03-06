@@ -6,6 +6,7 @@
 #include<string.h>
 #include<fcntl.h>
 #include<time.h>
+#include<termios.h>
 
 
 /* generate bytes of random data */
@@ -232,6 +233,19 @@ static char *determine_target(int encrypting, const char *odir,
     return tgt;
 }
 
+/* tty_echo turns on or off terminal echo */
+void tty_echo(int echo, FILE* tty_file)
+{
+    struct termios tty;
+    int tty_fd = fileno(tty_file);
+    tcgetattr(tty_fd, &tty);
+    if( echo )
+        tty.c_lflag |= ECHO;
+    else
+        tty.c_lflag &= ~ECHO;
+
+    (void) tcsetattr(tty_fd, TCSANOW, &tty);
+} 
 
 /* read_pw_tty opens /dev/tty and speaks
  * directly to the user, asking for a password.
@@ -254,10 +268,14 @@ uint8_t* read_pw_tty(void)
 
   fputs("Password: ", tty);
   fflush(tty);
+  tty_echo(0,tty); 
+  
   if(fgets(pwbuff, sizeof(pwbuff), tty) == NULL) {
      fputs("Error reading pw!\n", stderr); 
   }
 
+  tty_echo(1,tty); 
+  fputs("\n", tty);
   fclose(tty);
 
   len = strlen(pwbuff);
