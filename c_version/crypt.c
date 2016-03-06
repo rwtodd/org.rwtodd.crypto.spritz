@@ -233,12 +233,12 @@ static char *determine_target(int encrypting, const char *odir,
 }
 
 
-/* collect_password opens /dev/tty and speaks
+/* read_pw_tty opens /dev/tty and speaks
  * directly to the user, asking for a password.
  * This way, it will work even when the program
  * is processing stdin.
  */
-uint8_t* collect_password(void)
+uint8_t* read_pw_tty(void)
 {
   char pwbuff[256];
   uint8_t * pw_hash = NULL;
@@ -270,6 +270,30 @@ uint8_t* collect_password(void)
      pwbuff[--len] == '\0';
 
   return spritz_mem_hash(pwbuff, len, 32);
+}
+
+/* collect_password will read the password
+ * from the tty the specified number of times
+ * and make sure they always match.  Realistically,
+ * times will only be 1 or 2
+ */
+uint8_t *collect_password(int times) {
+  uint8_t * pw_hash = read_pw_tty();
+
+  while(pw_hash && --times) {
+     uint8_t *next_hash = read_pw_tty();
+     int pw_ok = (next_hash != NULL) && (memcmp(next_hash, pw_hash, 32)==0);
+     destroy_spritz_hash(next_hash);
+
+     if(!pw_ok) {
+	fputs("Passwords don't match!\n",stderr);
+        destroy_spritz_hash(pw_hash);
+	return NULL;
+     }
+    
+  } 
+
+  return pw_hash;
 }
 
 
@@ -327,7 +351,10 @@ int main(int argc, char **argv)
      * on the terminal
      */
     if (pw_hash == NULL) {
-	pw_hash = collect_password();
+	pw_hash = collect_password( (proc == decrypt_file)? 1 : 2 );
+        if(pw_hash == NULL) {
+		exit(1);
+        }
     }
 
     srand(time(NULL));
