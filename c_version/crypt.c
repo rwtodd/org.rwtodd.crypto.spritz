@@ -232,6 +232,47 @@ static char *determine_target(int encrypting, const char *odir,
     return tgt;
 }
 
+
+/* collect_password opens /dev/tty and speaks
+ * directly to the user, asking for a password.
+ * This way, it will work even when the program
+ * is processing stdin.
+ */
+uint8_t* collect_password(void)
+{
+  char pwbuff[256];
+  uint8_t * pw_hash = NULL;
+  size_t len = 0;
+  FILE *tty;
+
+  memset(pwbuff,0, sizeof(pwbuff));
+
+  if( (tty = fopen("/dev/tty", "r+")) == NULL ) {
+     fputs("Couldn't open tty!\n", stderr);
+     return NULL;
+  } 
+
+  fputs("Password: ", tty);
+  fflush(tty);
+  if(fgets(pwbuff, sizeof(pwbuff), tty) == NULL) {
+     fputs("Error reading pw!\n", stderr); 
+  }
+
+  fclose(tty);
+
+  len = strlen(pwbuff);
+  if(len <= 1) {
+	fputs("Error collecting password!\n",stderr);
+	return NULL;
+  }
+
+  if(pwbuff[len-1] == '\n')
+     pwbuff[--len] == '\0';
+
+  return spritz_mem_hash(pwbuff, len, 32);
+}
+
+
 int main(int argc, char **argv)
 {
     /* parse cmdline args */
@@ -282,12 +323,17 @@ int main(int argc, char **argv)
 	}
     }
 
+    /* if we didn't get a password on the command line, ask for it
+     * on the terminal
+     */
     if (pw_hash == NULL) {
-	usage();
+	pw_hash = collect_password();
     }
+
     srand(time(NULL));
 
-    int err = 0;		/* track errors */
+    /* process the files, or stdin */
+    int err = 0;
     if ((optind >= argc) ||
 	((argc - optind == 1) && (!strcmp(argv[optind], "-")))
 	) {
