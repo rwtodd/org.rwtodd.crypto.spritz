@@ -234,60 +234,60 @@ static char *determine_target(int encrypting, const char *odir,
 }
 
 /* tty_echo turns on or off terminal echo */
-void tty_echo(int echo, FILE* tty_file)
+void tty_echo(int echo, FILE * tty_file)
 {
     struct termios tty;
     int tty_fd = fileno(tty_file);
     tcgetattr(tty_fd, &tty);
-    if( echo )
-        tty.c_lflag |= ECHO;
+    if (echo)
+	tty.c_lflag |= ECHO;
     else
-        tty.c_lflag &= ~ECHO;
+	tty.c_lflag &= ~ECHO;
 
     (void) tcsetattr(tty_fd, TCSANOW, &tty);
-} 
+}
 
 /* read_pw_tty opens /dev/tty and speaks
  * directly to the user, asking for a password.
  * This way, it will work even when the program
  * is processing stdin.
  */
-uint8_t* read_pw_tty(void)
+uint8_t *read_pw_tty(void)
 {
-  char pwbuff[256];
-  uint8_t * pw_hash = NULL;
-  size_t len = 0;
-  FILE *tty;
+    char pwbuff[256];
+    uint8_t *pw_hash = NULL;
+    size_t len = 0;
+    FILE *tty;
 
-  memset(pwbuff,0, sizeof(pwbuff));
+    memset(pwbuff, 0, sizeof(pwbuff));
 
-  if( (tty = fopen("/dev/tty", "r+")) == NULL ) {
-     fputs("Couldn't open tty!\n", stderr);
-     return NULL;
-  } 
-
-  fputs("Password: ", tty);
-  fflush(tty);
-  tty_echo(0,tty); 
-  
-  if(fgets(pwbuff, sizeof(pwbuff), tty) == NULL) {
-     fputs("Error reading pw!\n", stderr); 
-  }
-
-  tty_echo(1,tty); 
-  fputs("\n", tty);
-  fclose(tty);
-
-  len = strlen(pwbuff);
-  if(len <= 1) {
-	fputs("Error collecting password!\n",stderr);
+    if ((tty = fopen("/dev/tty", "r+")) == NULL) {
+	fputs("Couldn't open tty!\n", stderr);
 	return NULL;
-  }
+    }
 
-  if(pwbuff[len-1] == '\n')
-     pwbuff[--len] == '\0';
+    fputs("Password: ", tty);
+    fflush(tty);
+    tty_echo(0, tty);
 
-  return spritz_mem_hash(pwbuff, len, 32);
+    if (fgets(pwbuff, sizeof(pwbuff), tty) == NULL) {
+	fputs("Error reading pw!\n", stderr);
+    }
+
+    tty_echo(1, tty);
+    fputs("\n", tty);
+    fclose(tty);
+
+    len = strlen(pwbuff);
+    if (len <= 1) {
+	fputs("Error collecting password!\n", stderr);
+	return NULL;
+    }
+
+    if (pwbuff[len - 1] == '\n')
+	pwbuff[--len] == '\0';
+
+    return spritz_mem_hash(pwbuff, len, 32);
 }
 
 /* collect_password will read the password
@@ -295,23 +295,25 @@ uint8_t* read_pw_tty(void)
  * and make sure they always match.  Realistically,
  * times will only be 1 or 2
  */
-uint8_t *collect_password(int times) {
-  uint8_t * pw_hash = read_pw_tty();
+uint8_t *collect_password(int times)
+{
+    uint8_t *pw_hash = read_pw_tty();
 
-  while(pw_hash && --times) {
-     uint8_t *next_hash = read_pw_tty();
-     int pw_ok = (next_hash != NULL) && (memcmp(next_hash, pw_hash, 32)==0);
-     destroy_spritz_hash(next_hash);
+    while (pw_hash && --times) {
+	uint8_t *next_hash = read_pw_tty();
+	int pw_ok = (next_hash != NULL)
+	    && (memcmp(next_hash, pw_hash, 32) == 0);
+	destroy_spritz_hash(next_hash);
 
-     if(!pw_ok) {
-	fputs("Passwords don't match!\n",stderr);
-        destroy_spritz_hash(pw_hash);
-	return NULL;
-     }
-    
-  } 
+	if (!pw_ok) {
+	    fputs("Passwords don't match!\n", stderr);
+	    destroy_spritz_hash(pw_hash);
+	    return NULL;
+	}
 
-  return pw_hash;
+    }
+
+    return pw_hash;
 }
 
 
@@ -369,10 +371,10 @@ int main(int argc, char **argv)
      * on the terminal
      */
     if (pw_hash == NULL) {
-	pw_hash = collect_password( (proc == decrypt_file)? 1 : 2 );
-        if(pw_hash == NULL) {
-		exit(1);
-        }
+	pw_hash = collect_password((proc == decrypt_file) ? 1 : 2);
+	if (pw_hash == NULL) {
+	    exit(1);
+	}
     }
 
     srand(time(NULL));
