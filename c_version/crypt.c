@@ -285,9 +285,9 @@ uint8_t *read_pw_tty(void)
     }
 
     if (pwbuff[len - 1] == '\n')
-	pwbuff[--len] == '\0';
+       --len;
 
-    return spritz_mem_hash(pwbuff, len, 32);
+    return spritz_mem_hash( (uint8_t *)pwbuff, len, 32);
 }
 
 /* collect_password will read the password
