@@ -16,11 +16,22 @@
 
 package rwt.spritz
 
-import com.waywardcode.crypto.SpritzCipher
+import com.waywardcode.crypto.{SpritzCipher, SpritzInputStream, SpritzOutputStream}
 import java.io.FileInputStream
 import java.io.FileOutputStream
 
 object Crypt {
+
+  private def copy(instr: java.io.InputStream,
+                   outstr: java.io.OutputStream): Unit = {
+     val buffer = new Array[Byte](4096)
+
+     var count = instr.read(buffer) 
+     while(count >= 0) {
+        outstr.write(buffer,0,count)
+        count = instr.read(buffer)
+     }
+  }
  
   private def doOne(pw: String, fname: String): Unit = {
      val encrypted = """^(.*)\.spritz$""".r
@@ -34,9 +45,9 @@ object Crypt {
      val outstream = new FileOutputStream( outname )
      try {
        if (decrypting) {
-          SpritzCipher.decrypt(pw,instream,outstream)
+          copy(new SpritzInputStream(pw, instream), outstream)
        } else {
-          SpritzCipher.encrypt(pw,instream,outstream)
+          copy(instream, new SpritzOutputStream(pw, outstream))
        }
      } catch {
         case e: Exception => println("Error: " + e.toString())
