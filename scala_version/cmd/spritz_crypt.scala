@@ -17,8 +17,8 @@
 package rwt.spritz
 
 import com.waywardcode.crypto.{SpritzCipher, SpritzInputStream, SpritzOutputStream}
-import java.io.FileInputStream
-import java.io.FileOutputStream
+import java.io.{FileInputStream,FileOutputStream}
+import joptsimple.OptionParser
 
 object Crypt {
 
@@ -33,22 +33,22 @@ object Crypt {
      }
   }
  
-  private def doOne(pw: String, fname: String): Unit = {
-     val encrypted = """^(.*)\.spritz$""".r
-     val outname = fname match {  
-          case encrypted(name) => name 
-          case _               => s"${fname}.spritz"
+  private def decryptOne(pw: String)(fname: String): Unit = {
+     val outname = if(fname.endsWith(".spritz")) {
+                        fname.dropRight(7)
+                     } else {
+                        fname + ".unenc"
+                     }
+     val (instream, outstream) = fname match {
+          case "-" => (System.in, System.out)
+          case _   => (new FileInputStream(fname),
+                       new FileOutputStream(outname))
      }
-     val decrypting = fname.endsWith(".spritz")
- 
-     val instream = new FileInputStream(fname)
-     val outstream = new FileOutputStream( outname )
      try {
-       if (decrypting) {
           copy(new SpritzInputStream(pw, instream), outstream)
-       } else {
-          copy(instream, new SpritzOutputStream(pw, outstream))
-       }
+          if(outstream != System.out) {
+            println(s"$fname -decrypt-> $outname")
+          } 
      } catch {
         case e: Exception => println("Error: " + e.toString())
      } finally {
@@ -57,11 +57,50 @@ object Crypt {
      }
   }
 
-  def main(args: Array[String]): Unit = {
-     val pw = args(0)
-     println(s"Password is: <$pw>")
-     args.iterator.drop(1) foreach { doOne(pw,_) }
+  private def encryptOne(pw: String)(fname: String): Unit = {
+     val outname = fname + ".spritz" 
+     val (instream, outstream) = fname match {
+          case "-" => (System.in, System.out)
+          case _   => (new FileInputStream(fname),
+                       new FileOutputStream(outname))
+     }
+     try {
+          copy(instream, new SpritzOutputStream(pw, outstream))
+          if(outstream != System.out) {
+            println(s"$fname -encrypt-> $outname")
+          } 
+     } catch {
+        case e: Exception => println("Error: " + e.toString())
+     } finally {
+       instream.close()
+       outstream.close()
+     }
+  }
 
+  def cmd(args: Seq[String]): Unit = {
+     val jopt = new OptionParser()
+     val dOption = jopt.accepts("d")
+     val pOption = jopt.accepts("p").
+                        withRequiredArg.
+                        ofType(classOf[String]).
+                        defaultsTo("")
+     val files = jopt.nonOptions.ofType(classOf[String])
+     jopt.posixlyCorrect(true)
+
+     val opts = jopt.parse(args:_*)
+     val passwd = opts.valueOf(pOption)
+     if(passwd.length == 0) {
+        throw new Exception("Password Required!")
+     }
+
+     val process = if(opts.has(dOption)) { encryptOne(passwd)_ } 
+                                    else { decryptOne(passwd)_ }
+
+     import scala.collection.JavaConversions._ // to iterate over java List
+
+     var flist = opts.valuesOf(files)
+     if(flist.size == 0) { flist = flist ++ Seq("-") }
+     flist foreach process
   }
 
 }
