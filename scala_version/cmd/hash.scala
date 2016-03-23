@@ -18,7 +18,6 @@ package rwt.spritz
 
 import com.waywardcode.crypto.SpritzCipher
 import java.io.FileInputStream
-import joptsimple.OptionParser
 
 object Hash {
  
@@ -35,24 +34,23 @@ object Hash {
      println("")
   }
 
-  def cmd(args: Seq[String]): Unit = {
+  def cmd(args: Seq[String]): Boolean = {
 
-     val jopt = new OptionParser()
-     val sOption = jopt.accepts("s").
-                        withRequiredArg.
-                        ofType(classOf[Int]).
-                        defaultsTo(256)
-     val files = jopt.nonOptions.ofType(classOf[String])
-     jopt.posixlyCorrect(true)
+     var size = 256
 
-     val opts = jopt.parse(args:_*)
-     val size = opts.valueOf(sOption)
+     @annotation.tailrec
+     def parseArgs(args: Seq[String]) : Seq[String] = {
+        args match {
+          case "-s" :: sz :: rest => size = sz.toInt
+                                     parseArgs(rest)
+          case rest               => rest
+        }
+     }
 
-     import scala.collection.JavaConversions._ // to iterate over java List
-
-     var flist = opts.valuesOf(files)
-     if(flist.size == 0) { flist = flist ++ Seq("-") }
+     var flist = parseArgs(args)
+     if(flist.size == 0) { flist = Seq("-") }
      flist foreach doOne(size)
+     false
   }
 
 }

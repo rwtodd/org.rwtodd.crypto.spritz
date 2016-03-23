@@ -18,7 +18,6 @@ package rwt.spritz
 
 import com.waywardcode.crypto.{SpritzCipher, SpritzInputStream, SpritzOutputStream}
 import java.io.{FileInputStream,FileOutputStream}
-import joptsimple.OptionParser
 
 object Crypt {
 
@@ -33,6 +32,8 @@ object Crypt {
      }
   }
  
+  private var errors = false
+
   private def decryptOne(pw: String)(fname: String): Unit = {
      val outname = if(fname.endsWith(".spritz")) {
                         fname.dropRight(7)
@@ -51,6 +52,7 @@ object Crypt {
           } 
      } catch {
         case e: Exception => System.err.println("Error: " + e.toString())
+                             errors = true
      } finally {
        instream.close()
        outstream.close()
@@ -71,36 +73,39 @@ object Crypt {
           } 
      } catch {
         case e: Exception => println("Error: " + e.toString())
+                             errors = true
      } finally {
        instream.close()
        outstream.close()
      }
   }
 
-  def cmd(args: Seq[String]): Unit = {
-     val jopt = new OptionParser()
-     val dOption = jopt.accepts("d")
-     val pOption = jopt.accepts("p").
-                        withRequiredArg.
-                        ofType(classOf[String]).
-                        defaultsTo("")
-     val files = jopt.nonOptions.ofType(classOf[String])
-     jopt.posixlyCorrect(true)
+  def cmd(args: Seq[String]): Boolean = {
+     var decrypt = false
+     var passwd = ""
 
-     val opts = jopt.parse(args:_*)
-     val passwd = opts.valueOf(pOption)
+     @annotation.tailrec
+     def parseArgs(args: Seq[String]): Seq[String] = {
+        args match {
+          case "-d" :: rest        => decrypt = true
+                                      parseArgs(rest)
+          case "-p" :: str :: rest => passwd  = str
+                                      parseArgs(rest)
+          case rest                => rest
+        }
+     }
+     var flist = parseArgs(args)
+
      if(passwd.length == 0) {
         throw new Exception("Password Required!")
      }
 
-     val process = if(opts.has(dOption)) { decryptOne(passwd)_ } 
-                                    else { encryptOne(passwd)_ }
+     val process = if(decrypt) { decryptOne(passwd)_ } 
+                          else { encryptOne(passwd)_ }
 
-     import scala.collection.JavaConversions._ // to iterate over java List
-
-     var flist = opts.valuesOf(files)
-     if(flist.size == 0) { flist = flist ++ Seq("-") }
+     if(flist.size == 0) { flist = Seq("-") }
      flist foreach process
+     errors
   }
 
 }

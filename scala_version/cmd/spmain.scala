@@ -21,12 +21,15 @@ Usage: spritz (hash|crypt) [args]
 
   def main(args: Array[String]): Unit = {
      try {
-        args.toList match {
+        val errs:Boolean = args.toList match {
           case "hash"  :: rest => Hash.cmd(rest)
           case "crypt" :: rest => Crypt.cmd(rest)
           case _               => System.err.print(usage)
                                   System.exit(1)
+                                  true
         }
+
+        if(errs) System.exit(1)
      } catch {
          case e: Exception => System.err.print(usage)
                               System.err.print(e) 

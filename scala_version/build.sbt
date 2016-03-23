@@ -15,7 +15,6 @@ lazy val lib = (project in file("lib")).
 lazy val cmd = (project in file("cmd")).
   settings(commonSettings: _*).
   settings(
-    name := "spritz_cmd",
-    libraryDependencies += "net.sf.jopt-simple" % "jopt-simple" % "5.0"
+    name := "spritz_cmd"
   ).
   dependsOn(lib)
