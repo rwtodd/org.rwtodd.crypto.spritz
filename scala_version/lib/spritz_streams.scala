@@ -69,7 +69,7 @@ class SpritzInputStream(key: String,
      val randBytes = initial.view(4,8)
      val randHash  = initial.view(8,12)
      val testHash = SpritzCipher.hash(32,randBytes)
-     if ( testHash.equals(randHash) ) {
+     if (!testHash.sameElements(randHash)) {
          throw new IllegalStateException("Bad Password or corrupted file!");
      } 
 

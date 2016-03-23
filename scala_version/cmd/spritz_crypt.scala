@@ -50,7 +50,7 @@ object Crypt {
             println(s"$fname -decrypt-> $outname")
           } 
      } catch {
-        case e: Exception => println("Error: " + e.toString())
+        case e: Exception => System.err.println("Error: " + e.toString())
      } finally {
        instream.close()
        outstream.close()
@@ -93,8 +93,8 @@ object Crypt {
         throw new Exception("Password Required!")
      }
 
-     val process = if(opts.has(dOption)) { encryptOne(passwd)_ } 
-                                    else { decryptOne(passwd)_ }
+     val process = if(opts.has(dOption)) { decryptOne(passwd)_ } 
+                                    else { encryptOne(passwd)_ }
 
      import scala.collection.JavaConversions._ // to iterate over java List
 
