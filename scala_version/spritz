@@ -1,0 +1,3 @@
+#!/bin/bash
+export CLASSPATH=~/jars/scala-library-2.11.8.jar:~/jars/spritz_2.11-1.0.jar:~/jars/spritz_cmd_2.11-1.0.jar
+java rwt.spritz.Spritz $*
