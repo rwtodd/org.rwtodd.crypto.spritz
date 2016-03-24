@@ -15,6 +15,7 @@ Usage: spritz (hash|crypt) [args]
    Encrypt/Decrypt files
 
      -d     decrypt files (default is to encrypt)
+     -o     specify the output directory (default is same as file)
      -p     specify the password to use 
 
 """
