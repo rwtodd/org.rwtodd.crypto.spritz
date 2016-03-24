@@ -32,8 +32,6 @@ object Crypt {
      }
   }
  
-  private var errors = false
-
   private def decryptOne(pw: String)(fname: String): Unit = {
      val outname = if(fname.endsWith(".spritz")) {
                         fname.dropRight(7)
@@ -50,9 +48,6 @@ object Crypt {
           if(outstream != System.out) {
             println(s"$fname -decrypt-> $outname")
           } 
-     } catch {
-        case e: Exception => System.err.println("Error: " + e.toString())
-                             errors = true
      } finally {
        instream.close()
        outstream.close()
@@ -71,21 +66,30 @@ object Crypt {
           if(outstream != System.out) {
             println(s"$fname -encrypt-> $outname")
           } 
-     } catch {
-        case e: Exception => println("Error: " + e.toString())
-                             errors = true
      } finally {
        instream.close()
        outstream.close()
      }
   }
 
-  def cmd(args: Seq[String]): Boolean = {
+  private def getPasswd(times: Int): Option[String] = {
+     val c = System.console()
+     if (c == null) { return None }
+
+     val chrs = c.readPassword("[Password]:")
+     for(_ <- 1 until times) {
+         val rpt = c.readPassword("[Confirm Password]:")
+         if(!rpt.sameElements(chrs)) { throw new Exception("Passwords don't match!") }
+     }
+     Some(new String(chrs))
+  }
+
+  def cmd(args: List[String]): Unit = {
      var decrypt = false
      var passwd = ""
 
      @annotation.tailrec
-     def parseArgs(args: Seq[String]): Seq[String] = {
+     def parseArgs(args: List[String]): List[String] = {
         args match {
           case "-d" :: rest        => decrypt = true
                                       parseArgs(rest)
@@ -97,15 +101,18 @@ object Crypt {
      var flist = parseArgs(args)
 
      if(passwd.length == 0) {
-        throw new Exception("Password Required!")
+        passwd = getPasswd(if(decrypt) 1 else 2).getOrElse("")
+         
+        if(passwd.length == 0) {
+           throw new Exception("Password Required!")
+        }
      }
 
      val process = if(decrypt) { decryptOne(passwd)_ } 
                           else { encryptOne(passwd)_ }
 
-     if(flist.size == 0) { flist = Seq("-") }
+     if(flist.isEmpty) { flist = List("-") }
      flist foreach process
-     errors
   }
 
 }

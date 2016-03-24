@@ -34,12 +34,12 @@ object Hash {
      println("")
   }
 
-  def cmd(args: Seq[String]): Boolean = {
+  def cmd(args: List[String]): Unit = {
 
      var size = 256
 
      @annotation.tailrec
-     def parseArgs(args: Seq[String]) : Seq[String] = {
+     def parseArgs(args: List[String]) : List[String] = {
         args match {
           case "-s" :: sz :: rest => size = sz.toInt
                                      parseArgs(rest)
@@ -48,9 +48,8 @@ object Hash {
      }
 
      var flist = parseArgs(args)
-     if(flist.size == 0) { flist = Seq("-") }
+     if(flist.isEmpty) { flist = List("-") }
      flist foreach doOne(size)
-     false
   }
 
 }
