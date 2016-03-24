@@ -32,12 +32,17 @@ object Crypt {
      }
   }
  
-  private def decryptOne(pw: String)(fname: String): Unit = {
-     val outname = if(fname.endsWith(".spritz")) {
-                        fname.dropRight(7)
-                     } else {
-                        fname + ".unenc"
-                     }
+  private def changeDir(infl: String, odir: String): String = odir match {
+       case ""  =>  infl 
+       case _   =>  new java.io.File(odir, new java.io.File(infl).getName).toString 
+  }
+
+  private def decryptOne(pw: String, odir: String)(fname: String): Unit = {
+     val outname = changeDir(if(fname.endsWith(".spritz")) {
+                               fname.dropRight(7)
+                             } else {
+                               fname + ".unenc"
+                             }, odir)
      val (instream, outstream) = fname match {
           case "-" => (System.in, System.out)
           case _   => (new FileInputStream(fname),
@@ -54,8 +59,8 @@ object Crypt {
      }
   }
 
-  private def encryptOne(pw: String)(fname: String): Unit = {
-     val outname = fname + ".spritz" 
+  private def encryptOne(pw: String, odir: String)(fname: String): Unit = {
+     val outname = changeDir(fname + ".spritz", odir)
      val (instream, outstream) = fname match {
           case "-" => (System.in, System.out)
           case _   => (new FileInputStream(fname),
@@ -87,6 +92,7 @@ object Crypt {
   def cmd(args: List[String]): Unit = {
      var decrypt = false
      var passwd = ""
+     var odir = ""
 
      @annotation.tailrec
      def parseArgs(args: List[String]): List[String] = {
@@ -94,6 +100,8 @@ object Crypt {
           case "-d" :: rest        => decrypt = true
                                       parseArgs(rest)
           case "-p" :: str :: rest => passwd  = str
+                                      parseArgs(rest)
+          case "-o" :: str :: rest => odir = str
                                       parseArgs(rest)
           case rest                => rest
         }
@@ -108,8 +116,8 @@ object Crypt {
         }
      }
 
-     val process = if(decrypt) { decryptOne(passwd)_ } 
-                          else { encryptOne(passwd)_ }
+     val process = if(decrypt) { decryptOne(passwd,odir)_ } 
+                          else { encryptOne(passwd,odir)_ }
 
      if(flist.isEmpty) { flist = List("-") }
      flist foreach process
