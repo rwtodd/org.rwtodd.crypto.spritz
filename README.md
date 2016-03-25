@@ -5,7 +5,7 @@ the spritz cipher (described [in RS14.pdf][1]).  Every implementation
 is sufficient to compute a hash of file contents, and some of them
 can also encrypt and decrypt files.
 
-The three most mature implementations are:
+The most mature/featureful implementations are:
 
   * __C__: This is the fastest implementation.  It has gone through
   a number of iterations, you can see in the repo history.  Currently,
@@ -24,17 +24,17 @@ The three most mature implementations are:
   for concurrency.  It provides the encryption/decryption as stream
   wrappers, which is very nice.
 
+  * __scala__: Scala was the first implementation, when I was
+  looking for projects help me learn the language.  
+  It's interesting to compare it to the
+  java version, since it's so much smaller and nicer-looking.  Even
+  on the small scale, `val x` is much more compact than `final List<String> x`.
+  This was some of my first scala code, and I'm sure it has many
+  warts.
+
 The rest of the implementations--mostly just hashers--are mainly written 
 to compare the way they look, how hard they were to write, and
 how fast the resulting programs run.
-
-  * __scala__: Scala was the first implementation, when I was
-  briefly in love with the language and looking for projects
-  to try it out on.  This has a hasher and encryptor, but I didn't
-  make these concurrent.  It's interesting to compare it to the
-  java version, since `val x` is so much more compact than `final int x`.
-  This was some of my first scala code, and I'm sure it has many
-  warts.
 
   * __Forth__: Like all forth, it's a compact, fun program, and a 
   labor of love.  Depending on which forth you run it on, it is 
