@@ -1,5 +1,8 @@
 package com.waywardcode.crypto
 
+// This implementation is copyright 2015 Richard Todd
+// The license is GPL, see the LICENSE file in the repository.
+
 /** Implements an encrypted output stream via the Spritz stream cipher. 
   * This class uses SpritzCipher for all the heavy lifting.
   * @author Richard Todd

@@ -1,5 +1,7 @@
 package rwt.spritz
 
+// This implementation is copyright 2015 Richard Todd
+// The license is GPL, see the LICENSE file in the repository.
 
 object Spritz {
 
