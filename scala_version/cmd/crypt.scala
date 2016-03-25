@@ -6,10 +6,12 @@
 package rwt.spritz
 
 import com.waywardcode.crypto.{SpritzCipher, SpritzInputStream, SpritzOutputStream}
-import java.io.{FileInputStream,FileOutputStream}
+import java.io.{File,FileInputStream,FileOutputStream}
 
 object Crypt {
 
+  /** uses read()/write() to copy one iostream to another.
+    */
   private def copy(instr: java.io.InputStream,
                    outstr: java.io.OutputStream): Unit = {
      val buffer = new Array[Byte](4096)
@@ -21,9 +23,28 @@ object Crypt {
      }
   }
  
+  /** changes the path of a file, preserving the name */
   private def changeDir(infl: String, odir: String): String = odir match {
        case ""  =>  infl 
-       case _   =>  new java.io.File(odir, new java.io.File(infl).getName).toString 
+       case _   =>  new File(odir, new File(infl).getName).toString 
+  }
+
+  /** checks a file to make sure it can be decrypted with the given
+    * password.
+    */
+  private def checkOne(pw: String)(fname: String): Unit = {
+       val instream = fname match {
+          case "-" => System.in
+          case _   => new FileInputStream(fname)
+       }
+       try {
+          new SpritzInputStream(pw, instream)
+          System.out.println(s"$fname: correct!")
+       } catch {
+          case e: IllegalStateException => System.out.println(s"$fname: $e")
+       }finally {
+          instream.close()
+       }
   }
 
   private def decryptOne(pw: String, odir: String)(fname: String): Unit = {
@@ -80,12 +101,15 @@ object Crypt {
 
   def cmd(args: List[String]): Unit = {
      var decrypt = false
+     var check   = false   // check supersedes decrypt, if given
      var passwd = ""
      var odir = ""
 
      @annotation.tailrec
      def parseArgs(args: List[String]): List[String] = {
         args match {
+          case "-c" :: rest        => check   = true
+                                      parseArgs(rest)
           case "-d" :: rest        => decrypt = true
                                       parseArgs(rest)
           case "-p" :: str :: rest => passwd  = str
@@ -98,17 +122,18 @@ object Crypt {
      var flist = parseArgs(args)
 
      if(passwd.length == 0) {
-        passwd = getPasswd(if(decrypt) 1 else 2).getOrElse("")
+        passwd = getPasswd(if (decrypt||check) 1 else 2).getOrElse("")
          
-        if(passwd.length == 0) {
+        if (passwd.length == 0) {
            throw new Exception("Password Required!")
         }
      }
 
-     val process = if(decrypt) { decryptOne(passwd,odir)_ } 
-                          else { encryptOne(passwd,odir)_ }
+     val process = if (check) checkOne(passwd)_ 
+                   else if (decrypt) decryptOne(passwd,odir)_  
+                   else encryptOne(passwd,odir)_ 
 
-     if(flist.isEmpty) { flist = List("-") }
+     if (flist.isEmpty) { flist = List("-") }
      flist foreach process
   }
 
