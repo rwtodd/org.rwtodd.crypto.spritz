@@ -22,7 +22,7 @@ object Crypt {
         count = instr.read(buffer)
      }
   }
- 
+
   /** changes the path of a file, preserving the name */
   private def changeDir(infl: String, odir: String): String = odir match {
        case ""  =>  infl 
@@ -32,22 +32,22 @@ object Crypt {
   /** checks a file to make sure it can be decrypted with the given
     * password.
     */
-  private def checkOne(pw: String)(fname: String): Unit = {
+  private def checkOne(pw: String)(fname: String): String = {
        val instream = fname match {
           case "-" => System.in
           case _   => new FileInputStream(fname)
        }
        try {
           new SpritzInputStream(pw, instream)
-          System.out.println(s"$fname: correct!")
+          s"$fname: correct!"
        } catch {
-          case e: IllegalStateException => System.out.println(s"$fname: $e")
+          case e: IllegalStateException => s"$fname: $e"
        }finally {
           instream.close()
        }
   }
 
-  private def decryptOne(pw: String, odir: String)(fname: String): Unit = {
+  private def decryptOne(pw: String, odir: String)(fname: String): String = {
      val outname = changeDir(if(fname.endsWith(".spritz")) {
                                fname.dropRight(7)
                              } else {
@@ -60,16 +60,14 @@ object Crypt {
      }
      try {
           copy(new SpritzInputStream(pw, instream), outstream)
-          if(outstream != System.out) {
-            println(s"$fname -decrypt-> $outname")
-          } 
+          s"$fname -decrypt-> $outname"
      } finally {
        instream.close()
        outstream.close()
      }
   }
 
-  private def encryptOne(pw: String, odir: String)(fname: String): Unit = {
+  private def encryptOne(pw: String, odir: String)(fname: String): String = {
      val outname = changeDir(fname + ".spritz", odir)
      val (instream, outstream) = fname match {
           case "-" => (System.in, System.out)
@@ -78,9 +76,7 @@ object Crypt {
      }
      try {
           copy(instream, new SpritzOutputStream(pw, outstream))
-          if(outstream != System.out) {
-            println(s"$fname -encrypt-> $outname")
-          } 
+          s"$fname -encrypt-> $outname"
      } finally {
        instream.close()
        outstream.close()
@@ -133,8 +129,10 @@ object Crypt {
                    else if (decrypt) decryptOne(passwd,odir)_  
                    else encryptOne(passwd,odir)_ 
 
+     val printout: String=>Unit = if (flist.isEmpty) (x) => { } else println
+
      if (flist.isEmpty) { flist = List("-") }
-     flist foreach process
+     flist.par.map(process).foreach(printout(_))
   }
 
 }

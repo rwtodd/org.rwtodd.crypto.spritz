@@ -10,7 +10,7 @@ import java.io.FileInputStream
 
 object Hash {
  
-  private def doOne(size: Int)(fname: String): Unit = {
+  private def doOne(size: Int)(fname: String): String = {
      val fstream = fname match {
         case "-" => System.in
         case _   => new FileInputStream(fname)
@@ -18,9 +18,9 @@ object Hash {
      val answer = SpritzCipher.hash(size, fstream) 
      fstream.close()
 
-     print(s"$fname: ")
-     answer foreach { printf("%02x",_) }
-     println("")
+     val sb = new scala.collection.mutable.StringBuilder(fname).append(": ")
+     answer.foreach( b => sb.append("%02x".format(b)) )
+     sb.toString()
   }
 
   def cmd(args: List[String]): Unit = {
@@ -38,7 +38,7 @@ object Hash {
 
      var flist = parseArgs(args)
      if(flist.isEmpty) { flist = List("-") }
-     flist foreach doOne(size)
+     flist.par.map(doOne(size)).foreach(println)
   }
 
 }
