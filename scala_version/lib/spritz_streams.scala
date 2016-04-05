@@ -3,11 +3,14 @@ package com.waywardcode.crypto
 // This implementation is copyright 2015 Richard Todd
 // The license is GPL, see the LICENSE file in the repository.
 
+import java.io.File
+
 /** Implements an encrypted output stream via the Spritz stream cipher. 
   * This class uses SpritzCipher for all the heavy lifting.
   * @author Richard Todd
   */
-class SpritzOutputStream(key: String, 
+class SpritzOutputStream(fname: Option[String],
+                         key: String, 
                          os: java.io.OutputStream)
  extends java.io.FilterOutputStream(os) {
      private def init : SpritzCipher = {
@@ -15,14 +18,27 @@ class SpritzOutputStream(key: String,
 	     val iv = new Array[Byte](4)
 	     rnd.nextBytes(iv)
 	     val cipher = SpritzCipher.cipherStream(key,iv) 
+             val version = 1
+             os.write(version)
 	     os.write(iv)
+
 	     val randomBytes = new Array[Byte](4)
 	     rnd.nextBytes(randomBytes)
 	     val hashedBytes = SpritzCipher.hash(32,randomBytes)
+             val nameBytes = fname.map(new File(_).getName()).
+                                   getOrElse("").
+                                   getBytes("UTF-8")
+
 	     cipher.squeezeXOR(randomBytes)
 	     cipher.squeezeXOR(hashedBytes)
+             val namelen = (nameBytes.length  ^ cipher.drip())
+             cipher.squeezeXOR(nameBytes)
+
 	     os.write(randomBytes)
 	     os.write(hashedBytes)
+             os.write(namelen)
+	     os.write(nameBytes)
+
              cipher
      }
 
@@ -52,6 +68,9 @@ class SpritzInputStream(key: String,
                         is: java.io.InputStream) 
    extends java.io.FilterInputStream(is)  {
 
+   private var fname : Option[String] = None
+   def getFname = fname 
+
   /** Constructs an encrypted stream.
     * This method reads a 4-byte random initialization
     * vector, and creates a cipher stream with the IV and
@@ -63,18 +82,32 @@ class SpritzInputStream(key: String,
     * @param in the earlier InputStream in the chain.
     */
   private def init : SpritzCipher = {
-     val initial = new Array[Byte](12)
-     if( readFully(initial) != 12 ) {
-         throw new IllegalArgumentException("Instream wasn't even long enough to contain an encrypted stream!");
+     val initial = new Array[Byte](14)
+     if( readFully(initial) != 14 ) {
+         throw new IllegalStateException("Instream wasn't even long enough to contain an encrypted stream!")
      }
-     val cipher = SpritzCipher.cipherStream(key, initial.view(0,4))
-     cipher.squeezeXOR(initial.view(4,12))
-     val randBytes = initial.view(4,8)
-     val randHash  = initial.view(8,12)
+     if( initial(0) != 1 ) {
+         throw new IllegalStateException("Instream was from wrong version!") 
+     }
+
+     val cipher = SpritzCipher.cipherStream(key, initial.view(1,5))
+     cipher.squeezeXOR(initial.view(5,14))
+     val randBytes = initial.view(5,9)
+     val randHash  = initial.view(9,13)
      val testHash = SpritzCipher.hash(32,randBytes)
      if (!testHash.sameElements(randHash)) {
          throw new IllegalStateException("Bad Password or corrupted file!");
      } 
+
+     val fnamelen = initial(13)
+     if( fnamelen > 0 ) {
+        var fnameBytes = new Array[Byte](fnamelen)
+        if( readFully(fnameBytes) != fnamelen ) {
+            throw new IllegalStateException("Instream corrupted!")
+        }
+        cipher.squeezeXOR(fnameBytes)
+        fname = Some(new String(fnameBytes,"UTF-8"))
+     }
 
      cipher
   }

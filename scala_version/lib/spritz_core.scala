@@ -156,14 +156,25 @@ class SpritzCipher {
   */
 object SpritzCipher {
   def cipherStream(key: String, iv: Seq[Byte] = Nil): SpritzCipher = {
-     val pwhash = hash(256, key.getBytes("UTF-8")) 
-     val encStream = new SpritzCipher
-     encStream.absorb(pwhash)
+     val initStream = new SpritzCipher
      if(!iv.isEmpty) {
-        encStream.absorbStop()
-        encStream.absorb(iv)
+       initStream.absorb(iv)
+       initStream.absorbStop()
      }
-     encStream
+     initStream.absorb(hash(1024, key.getBytes("UTF-8")))
+     val keyBytes = initStream.squeeze(128)
+
+     (1 to 5000) foreach { _ =>
+        val rehash = new SpritzCipher
+        rehash.absorb(keyBytes)
+        rehash.absorbStop()
+        rehash.absorb( 128.toByte )
+        rehash.squeeze(keyBytes)
+     }
+
+     val cipher = new SpritzCipher
+     cipher.absorb(keyBytes)
+     cipher
   }
 
   def hash(bits: Int, data: Seq[Byte]): Array[Byte] = {

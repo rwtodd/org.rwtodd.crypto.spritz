@@ -38,8 +38,10 @@ object Crypt {
           case _   => new FileInputStream(fname)
        }
        try {
-          new SpritzInputStream(pw, instream)
-          s"$fname: correct!"
+          val insideName = new SpritzInputStream(pw, instream).
+                                       getFname.
+                                       getOrElse("(no name)")
+          s"$fname: correct password! File inside is $insideName"
        } catch {
           case e: IllegalStateException => s"$fname: $e"
        }finally {
@@ -48,18 +50,17 @@ object Crypt {
   }
 
   private def decryptOne(pw: String, odir: String)(fname: String): String = {
-     val outname = changeDir(if(fname.endsWith(".spritz")) {
-                               fname.dropRight(7)
-                             } else {
-                               fname + ".unenc"
-                             }, odir)
-     val (instream, outstream) = fname match {
-          case "-" => (System.in, System.out)
-          case _   => (new FileInputStream(fname),
-                       new FileOutputStream(outname))
+     val instream = if( fname == "-" ) System.in else new FileInputStream(fname)
+     val cipher = new SpritzInputStream(pw, instream)
+
+     val outname = cipher.getFname.getOrElse {
+          if(fname.endsWith(".spritz")) fname.dropRight(7)
+          else  (fname + ".unenc")
      }
+     val outstream = if( fname == "-" ) System.out
+                     else new FileOutputStream(changeDir(outname,odir))
      try {
-          copy(new SpritzInputStream(pw, instream), outstream)
+          copy(cipher, outstream)
           s"$fname -decrypt-> $outname"
      } finally {
        instream.close()
@@ -69,13 +70,14 @@ object Crypt {
 
   private def encryptOne(pw: String, odir: String)(fname: String): String = {
      val outname = changeDir(fname + ".spritz", odir)
-     val (instream, outstream) = fname match {
-          case "-" => (System.in, System.out)
+     val (instream, outstream, origName) = fname match {
+          case "-" => (System.in, System.out, None)
           case _   => (new FileInputStream(fname),
-                       new FileOutputStream(outname))
+                       new FileOutputStream(outname),
+                       Some(fname))
      }
      try {
-          copy(instream, new SpritzOutputStream(pw, outstream))
+          copy(instream, new SpritzOutputStream(origName, pw, outstream))
           s"$fname -encrypt-> $outname"
      } finally {
        instream.close()
