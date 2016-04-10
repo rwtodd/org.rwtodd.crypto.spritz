@@ -49,7 +49,7 @@ object Crypt {
        }
   }
 
-  private def decryptOne(pw: String, odir: String)(fname: String): String = {
+  private def decryptOne(pw: String, odir: Option[String])(fname: String): String = {
      val instream = if( fname == "-" ) System.in else new FileInputStream(fname)
      val cipher = new SpritzInputStream(pw, instream)
 
@@ -58,7 +58,11 @@ object Crypt {
           else  (fname + ".unenc")
      }
      val outstream = if( fname == "-" ) System.out
-                     else new FileOutputStream(changeDir(outname,odir))
+                     else {
+                           var outdir = odir.getOrElse( new File(fname).getParent )
+                           if( outdir == null ) outdir = ""
+                           new FileOutputStream(changeDir(outname,outdir))
+                     }
      try {
           copy(cipher, outstream)
           s"$fname -decrypt-> $outname"
@@ -68,8 +72,8 @@ object Crypt {
      }
   }
 
-  private def encryptOne(pw: String, odir: String)(fname: String): String = {
-     val outname = changeDir(fname + ".spritz", odir)
+  private def encryptOne(pw: String, odir: Option[String])(fname: String): String = {
+     val outname = changeDir(fname + ".spritz", odir.getOrElse(""))
      val (instream, outstream, origName) = fname match {
           case "-" => (System.in, System.out, None)
           case _   => (new FileInputStream(fname),
@@ -101,7 +105,7 @@ object Crypt {
      var decrypt = false
      var check   = false   // check supersedes decrypt, if given
      var passwd = ""
-     var odir = ""
+     var odir: Option[String] = None
 
      @annotation.tailrec
      def parseArgs(args: List[String]): List[String] = {
@@ -112,7 +116,7 @@ object Crypt {
                                       parseArgs(rest)
           case "-p" :: str :: rest => passwd  = str
                                       parseArgs(rest)
-          case "-o" :: str :: rest => odir = str
+          case "-o" :: str :: rest => odir = Some(str)
                                       parseArgs(rest)
           case rest                => rest
         }
