@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.*?>
+<?import java.util.*?>
+<?import javafx.scene.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.web.HTMLEditor?>
+
+<VBox  xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/8"  
+           id="main" fx:controller="rwt.spritz.MainWinController" 
+           prefHeight="600" prefWidth="800"  fx:id="root">
+    <children>
+        <MenuBar> 
+            <menus>
+            <Menu text="File">
+                <items>
+                    <MenuItem text="Open" onAction="#menuOpen" ></MenuItem>
+                    <MenuItem text="Save" onAction="#menuSave" ></MenuItem>
+                    <SeparatorMenuItem />
+                    <MenuItem text="Exit" onAction="#menuExit" ></MenuItem>
+                </items>
+            </Menu>
+            </menus>
+        </MenuBar>
+        <HBox>
+            <children>
+            <Label text="Password:"></Label>
+            <TextField fx:id="passw"></TextField>
+            </children>
+        </HBox> 
+        <HTMLEditor fx:id="editor" ></HTMLEditor>
+    </children>
+</VBox>
