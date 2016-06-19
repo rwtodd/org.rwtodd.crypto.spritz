@@ -30,7 +30,7 @@ public class SpritzOutputStream extends FilterOutputStream  {
     * @param fname the filename associated with the unencrypted output
     * @param key the password to use. It is converted to UTF-8 bytes.
     * @param out the next OutputStream in the chain.
-    * @throws java.io.IOException
+    * @throws java.io.IOException if there is a problem writing to 'out'
     */
   public SpritzOutputStream(final Optional<String> fname, final String key, final OutputStream out) 
     throws IOException
@@ -68,6 +68,7 @@ public class SpritzOutputStream extends FilterOutputStream  {
 
   /** Write a single encrypted byte.
     * @param b the byte to write.
+    * @throws java.io.IOException if there is a problem writing to the underlying stream
     */
   @Override
   public void write(int b) throws IOException {

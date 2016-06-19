@@ -29,6 +29,7 @@ public class SpritzInputStream extends FilterInputStream  {
     * decryption stream. 
     * @param key the password to use. It is converted to UTF-8 bytes.
     * @param in the earlier InputStream in the chain.
+    * @throws java.io.IOException if there is a problem reading from 'in'
     */
   public SpritzInputStream(final String key, final InputStream in) 
     throws IOException
@@ -107,7 +108,7 @@ public class SpritzInputStream extends FilterInputStream  {
   /** Reads a series of bytes.
     * @param b the buffer to read into.
     * @param off offset into the buffer.
-    * @param the maximum amount of bytes to read.
+    * @param len the maximum amount of bytes to read.
     * @return the number of bytes read.
     */
   @Override

@@ -247,6 +247,7 @@ public class SpritzCipher {
     * @param bits how many bits wide to make the hash.
     * @param instr the data to hash.
     * @return the hash
+    * @throws java.io.IOException if there is a problem with the IO
     */
   public static byte[] hash(final int bits, final java.io.InputStream instr) 
     throws java.io.IOException {
