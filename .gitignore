@@ -1,6 +1,7 @@
 *.class
 *.log
 
+
 # sbt specific
 .cache
 .history
@@ -15,3 +16,12 @@ project/plugins/project/
 # Scala-IDE specific
 .scala_dependencies
 .worksheet
+/java_version/SpritzCLI/nbproject/private/
+/java_version/JEncrNotes/nbproject/private/
+/java_version/SpritzCipher/nbproject/private/
+/java_version/SpritzCipher/dist/
+/java_version/SpritzCipher/build/
+/java_version/SpritzCLI/build/
+/java_version/SpritzCLI/dist/
+/java_version/JEncrNotes/build/
+/java_version/JEncrNotes/dist/
