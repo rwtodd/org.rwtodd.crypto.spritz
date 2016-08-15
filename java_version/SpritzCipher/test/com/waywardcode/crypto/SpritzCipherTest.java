@@ -34,8 +34,24 @@ public class SpritzCipherTest {
 //    public void tearDown() {
 //    }
 
+    
     /**
-     * Test of reset method, of class SpritzCipher.
+     * Test that hashes on channels come out the same an arrays...
+     * @throws java.io.IOException
+     */
+    @Test
+    public void testHashTypes() throws java.io.IOException {
+        byte[] orig = "Here is an example text".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] arrHash = SpritzCipher.hash(256, orig);
+        
+        java.io.InputStream  origStream = new java.io.ByteArrayInputStream(orig);
+        byte[] isHash = SpritzCipher.hash(256, origStream);
+               
+        Assert.assertArrayEquals(arrHash, isHash);
+    }
+    
+    /**
+     * Test of SpritzCipher hash.
      */
     @Test
     public void testHashes() {
