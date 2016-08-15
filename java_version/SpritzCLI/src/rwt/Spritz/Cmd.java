@@ -62,7 +62,7 @@ class Hasher {
     answer.append(f.getPath()).append(": ");
 
     try(FileInputStream fstream = new FileInputStream(f)) {
-
+        
       final byte[] hash = SpritzCipher.hash(bits, fstream);
       for(final byte b: hash) { answer.append(String.format("%02x",b)); }
 
@@ -101,8 +101,7 @@ class Hasher {
                 .parallel()
                 .flatMap(this::doOneArgument)
                 .map(this::doOneFile)
-                .sorted()
-                .forEachOrdered(System.out::println);     
+                .forEach(System.out::println);     
       } catch (Exception e) {
           System.err.println(e);
           System.err.println("---");
@@ -231,8 +230,7 @@ class Crypter {
                 .parallel()
                 .flatMap(this::doOneArgument)
                 .map(worker)
-                .sorted()
-                .forEachOrdered(System.out::println); 
+                .forEach(System.out::println); 
           
       } catch (Exception e) {
           System.err.println(e);
