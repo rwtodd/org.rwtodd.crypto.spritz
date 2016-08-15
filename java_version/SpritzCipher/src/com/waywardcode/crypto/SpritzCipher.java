@@ -251,20 +251,21 @@ public class SpritzCipher {
     */
   public static byte[] hash(final int bits, final java.io.InputStream instr) 
     throws java.io.IOException {
+        
      final SpritzCipher hasher = new SpritzCipher();
      final int bytes = (bits + 7)/8;
      final byte[]  buffer = new byte[4096];
 
-     int count = instr.read(buffer) ;
+     int count = 0;
      while(count >= 0) {
-        hasher.absorb(buffer,0,count);
         count = instr.read(buffer);
+        hasher.absorb(buffer,0,count);
      }
 
      hasher.absorbStop();
      hasher.absorb( (byte)bytes );
      return hasher.squeeze(bytes);
   }
-
+  
 }
 
