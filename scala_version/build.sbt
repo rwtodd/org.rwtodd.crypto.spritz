@@ -2,7 +2,8 @@
 lazy val commonSettings = Seq(
   organization := "com.waywardcode",
   version := "1.0",
-  scalaVersion := "2.11.8"
+  scalaVersion := "2.12.0-M5",  // "2.11.8",
+  scalacOptions := Seq("-opt:l:classpath")
 )
 
 
