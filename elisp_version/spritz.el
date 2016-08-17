@@ -225,7 +225,7 @@
   (interactive "fFilename:\nsPassword:")
   (switch-to-buffer (generate-new-buffer (file-name-nondirectory fn)))
   (let ((filename (spritz-decrypt-file fn pw)))
-    (if (> 0 (length filename))
+    (if (> (length filename) 0)
 	(rename-buffer filename))))
     
 
