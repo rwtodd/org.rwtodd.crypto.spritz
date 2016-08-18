@@ -254,10 +254,9 @@ current buffer. The numeric argument gives the hash size in bits."
 	   (header (spritz-squeeze-xor-seq cipher (substring-no-properties bindat 5 14)))
 	   (randhash (spritz-hash-seq 32 (substring-no-properties header 0 4))))
  
-      (when (not (equal randhash 
-			(substring-no-properties header 4 8)))
-	(spritz-disphash randhash) (insert "   ") (spritz-disphash (substring-no-properties header 4 8)) (insert "\n")
-	(error "Bad password or corrupted file!"))
+      (if (not (equal randhash 
+		      (substring-no-properties header 4 8)))
+	  (error "Bad password or corrupted file!"))
 
       ;; step 3 ... skip the filename for now...
       (let* ((fname-length (aref header 8))
