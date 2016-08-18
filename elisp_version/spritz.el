@@ -19,10 +19,16 @@ current buffer. The numeric argument gives the hash size in bits."
 (defun spritz-decrypt (fn pw)
   "Load an encrypted file with the given password."
   (interactive "fFilename:\nsPassword:")
-  (switch-to-buffer (generate-new-buffer (file-name-nondirectory fn)))
-  (let ((filename (spritz-decrypt-file fn pw)))
-    (if (> (length filename) 0)
-	(rename-buffer filename))
+  (let* ((filename (file-name-nondirectory fn))
+	 (text 
+	  (with-temp-buffer
+	    (set-buffer-multibyte nil)
+	    (let ((decrypted-filename (spritz-decrypt-file fn pw)))
+	      (if (> (length decrypted-filename) 0)
+		  (setq filename decrypted-filename)))
+	    (string-as-multibyte (buffer-string)))))
+    (switch-to-buffer (generate-new-buffer filename))
+    (insert text)
     (goto-char (point-min))
     (normal-mode)))
 
@@ -53,7 +59,7 @@ current buffer. The numeric argument gives the hash size in bits."
 	(mapc #'insert (spritz-squeeze-xor-seq cipher text)))
 
         ;; now write the file..
-        (let ((coding-system-for-write 'raw-text-unix))
+        (let ((coding-system-for-write 'binary))
 	  (write-file (concat fn ".dat"))))))
       
 
@@ -206,7 +212,7 @@ current buffer. The numeric argument gives the hash size in bits."
   (with-temp-buffer
     (set-buffer-multibyte nil)
     (insert-file-contents-literally fn)
-    (buffer-string)))  ; TODO -- consider buffer-substring-no-properties
+    (buffer-substring-no-properties (point-min) (point-max))))
 
 (defun spritz-hash-file (fn sz)
   (spritz-hash-seq sz (spritz-read-binary-file fn))) 
