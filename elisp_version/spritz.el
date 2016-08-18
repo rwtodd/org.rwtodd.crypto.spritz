@@ -16,7 +16,7 @@
 ;; --- END OF INTERACTIVE FUNCTIONS. ---
 
 
-(defun spritz-u8+ (&rest args) (logand (apply #'+ args) 255))
+(defmacro spritz-u8+ (&rest args) `(logand (+ ,@args) 255))
 
 (defvar *reset-state* 
    (let ((vec (make-vector 256 0)))
@@ -26,39 +26,40 @@
 (defun make-spritz ()
   (spritz-reset (make-vector 7 0)))
 
-(defun spritz-i (s) (aref s 0))
-(defun spritz-set-i (s v) (aset s 0 v))
-(defun spritz-j (s) (aref s 1))
-(defun spritz-set-j (s v) (aset s 1 v))
-(defun spritz-k (s) (aref s 2))
-(defun spritz-set-k (s v) (aset s 2 v))
-(defun spritz-z (s) (aref s 3))
-(defun spritz-set-z (s v) (aset s 3 v))
-(defun spritz-a (s) (aref s 4))
-(defun spritz-set-a (s v) (aset s 4 v))
-(defun spritz-w (s) (aref s 5))
-(defun spritz-set-w (s v) (aset s 5 v))
+(defmacro spritz-i (s) `(aref ,s 0))
+(defmacro spritz-set-i (s v) `(aset ,s 0 ,v))
+(defmacro spritz-j (s) `(aref ,s 1))
+(defmacro spritz-set-j (s v) `(aset ,s 1 ,v))
+(defmacro spritz-k (s) `(aref ,s 2))
+(defmacro spritz-set-k (s v) `(aset ,s 2 ,v))
+(defmacro spritz-z (s) `(aref ,s 3))
+(defmacro spritz-set-z (s v) `(aset ,s 3 ,v))
+(defmacro spritz-a (s) `(aref ,s 4))
+(defmacro spritz-set-a (s v) `(aset ,s 4 ,v))
+(defmacro spritz-w (s) `(aref ,s 5))
+(defmacro spritz-set-w (s v) `(aset ,s 5 ,v))
 
-(defun spritz-inca (s) 
-  (aset s 4 (+ (aref s 4) 1)))
-(defun spritz-incw (s) 
-  (aset s 5 (spritz-u8+ (aref s 5) 1)))
+(defmacro spritz-inca (s) 
+  `(aset ,s 4 (+ (aref ,s 4) 1)))
 
-(defun spritz-mem (s idx) (aref (aref s 6) idx)) 
-(defun spritz-set-mem (s idx v) (aset (aref s 6) idx v))
+(defmacro spritz-incw (s) 
+  `(aset ,s 5 (spritz-u8+ (aref ,s 5) 1)))
+
+(defmacro spritz-mem (s idx) `(aref (aref ,s 6) ,idx)) 
+(defmacro spritz-set-mem (s idx v) `(aset (aref ,s 6) ,idx ,v))
 
 (defun spritz-reset (s) 
   "makes a spritz vector new and empty"
   (fillarray s 0)
-  (aset s 5 1) ;; set w to 1
+  (spritz-set-w s 1)
   (aset s 6 (copy-sequence *reset-state*))
   s)
 
-(defun spritz-swap (s i1 i2)
+(defmacro spritz-swap (s i1 i2)
   "swaps two mem values in a spritz cipher"
-   (let ((tmp (spritz-mem s i1)))
-     (spritz-set-mem s i1 (spritz-mem s i2))
-     (spritz-set-mem s i2 tmp)))
+   `(let ((tmp (spritz-mem ,s ,i1)))
+     (spritz-set-mem ,s ,i1 (spritz-mem ,s ,i2))
+     (spritz-set-mem ,s ,i2 tmp)))
 
 (defun spritz-crush (s) 
   (dotimes (i 128)
@@ -66,8 +67,8 @@
       (if (> (spritz-mem s i) (spritz-mem s other))
 	  (spritz-swap s i other)))))
 
-(defun spritz-mem-at-sum (s v1 v2)
-  (spritz-mem s (spritz-u8+ v1 v2)))
+(defmacro spritz-mem-at-sum (s &rest args)
+  `(spritz-mem ,s (spritz-u8+ ,@args)))
 
 (defun spritz-update (s times) 
   (let ((i (spritz-i s))
@@ -76,9 +77,12 @@
 	(w (spritz-w s))) 
     (dotimes (_ times)
       (setq i (spritz-u8+ i w))
-      (setq j (spritz-u8+ k (spritz-mem-at-sum s j (spritz-mem s i))))
-      (setq k (spritz-u8+ i k (spritz-mem s j)))
-      (spritz-swap s i j))
+      (let ((mem-i (spritz-mem s i)))
+        (setq j (spritz-u8+ k (spritz-mem-at-sum s j mem-i)))
+	(let ((mem-j (spritz-mem s j)))
+          (setq k (spritz-u8+ i k mem-j))
+          (spritz-set-mem s i mem-j)
+          (spritz-set-mem s j mem-i))))
     (spritz-set-i s i)
     (spritz-set-j s j)
     (spritz-set-k s k)))
@@ -102,18 +106,21 @@
   (spritz-whip s 512)
   (spritz-set-a s 0))
 
-(defun spritz-maybe-shuffle (s n)
-  (if (>= (spritz-a s) n)
-      (spritz-shuffle s)))
+(defmacro spritz-maybe-shuffle (s n)
+  `(if (>= (spritz-a ,s) ,n)
+      (spritz-shuffle ,s)))
 
 (defun spritz-absorb-nibble (s n)
   (spritz-maybe-shuffle s 128) 
-  (spritz-swap s (spritz-a s) (spritz-u8+ 128 n))
-  (spritz-inca s))
+  (let ((n128 (spritz-u8+ 128 n))
+        (sa   (spritz-a s)))
+    (spritz-swap s sa n128)
+    (spritz-inca s)))
 
-(defun spritz-absorb (s n)
-  (spritz-absorb-nibble s (logand n 15))
-  (spritz-absorb-nibble s (lsh n -4)))
+(defmacro spritz-absorb (s n)
+  `(progn 
+     (spritz-absorb-nibble ,s (logand ,n 15))
+     (spritz-absorb-nibble ,s (lsh ,n -4))))
 
 (defun spritz-absorb-seq (s bytes)
   (mapc (lambda (v) (spritz-absorb s v)) bytes))
@@ -152,8 +159,10 @@
   (mapc (lambda (v) (insert (format "%02x" v))) seq))
 
 (defun spritz-read-binary-file (fn)
-  (with-temp-buffer (insert-file-contents-literally fn)
-		    (buffer-string)))  ; TODO -- consider buffer-substring-no-properties
+  (with-temp-buffer
+    (set-buffer-multibyte nil)
+    (insert-file-contents-literally fn)
+    (buffer-string)))  ; TODO -- consider buffer-substring-no-properties
 
 (defun spritz-hash-file (fn sz)
   (spritz-hash-seq sz (spritz-read-binary-file fn))) 
@@ -169,7 +178,7 @@
     ;; now get the hash of the IV + key
     (spritz-squeeze s keybytes)
     ;; now, 5000 times, rehash...
-    (dotimes (cnt 50 keybytes)
+    (dotimes (cnt 5000 keybytes)
       (spritz-reset s)
       (spritz-absorb-seq s keybytes)
       (spritz-absorb-stop s)
@@ -190,8 +199,8 @@
 (defun spritz-decrypt-file (fn pw)
   (let ((bindat (spritz-read-binary-file fn)))
 
-    ;; step 1 .. check that first byte is 2
-    (if (not (eql (aref bindat 0) 2))
+    ;; step 1 .. check that first byte is 1
+    (if (not (eql (aref bindat 0) 1))
 	(error "File is in bad format!"))
 
     ;; step 2 ... generate a spritz stream with the IV and password,
@@ -200,9 +209,10 @@
 	   (header (spritz-squeeze-xor-seq cipher (substring-no-properties bindat 5 14)))
 	   (randhash (spritz-hash-seq 32 (substring-no-properties header 0 4))))
  
-      (if (not (equal randhash 
-		      (vconcat (substring-no-properties header 4 8))))
-	  (error "Bad password or corrupted file!"))
+      (when (not (equal randhash 
+			(vconcat (substring-no-properties header 4 8))))
+	(spritz-disphash randhash) (insert "   ") (spritz-disphash (substring-no-properties header 4 8)) (insert "\n")
+	(error "Bad password or corrupted file!"))
 
       ;; step 3 ... skip the filename for now...
       (let* ((fname-length (aref header 8))
@@ -239,8 +249,8 @@
 	(basename (string-as-unibyte (file-name-nondirectory fn))))
     (with-temp-buffer
       (set-buffer-multibyte nil)
-      ;; first byte is 2
-      (insert 2)
+      ;; first byte is 1
+      (insert 1)
       
       ;; generate a random IV, random bytes, their hash, and the cipher stream
       (let* ((iv     (spritz-generate-random))
