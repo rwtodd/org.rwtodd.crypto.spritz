@@ -16,7 +16,7 @@ There are three interactive functions at present:
 
 ## Multibyte Characters
 
-I think as long as we assume you want to use the elisp version for text files, I have 
+I think as long as you want to use the elisp version for text files, I have 
 successfully managed to round-trip UTF-8 characters without munging them.  It's harder
 than it seems like it should be!
 
@@ -44,7 +44,7 @@ So, I upped the version number on the save format to 2, and only do 500 rounds o
 on v2 files.  The elisp code can read v1 or v2 files, but I only make it write v2 files.
 At some point I may update the other implementations to understand the v1/v2 difference.
 
-## Alternte Implementation Idea
+## Alternate Implementation Idea
 
 An alternate (or even, supplementary) method would be to call out to a spritz binary
 (say, the Go version) and pipe the contents through it.  I like the self-contained
