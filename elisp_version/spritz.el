@@ -22,7 +22,9 @@ current buffer. The numeric argument gives the hash size in bits."
   (switch-to-buffer (generate-new-buffer (file-name-nondirectory fn)))
   (let ((filename (spritz-decrypt-file fn pw)))
     (if (> (length filename) 0)
-	(rename-buffer filename))))
+	(rename-buffer filename))
+    (goto-char (point-min))
+    (normal-mode)))
 
 (defun spritz-encrypt (fn pw)
   "Save the buffer encrypted to the given file with the given password."
