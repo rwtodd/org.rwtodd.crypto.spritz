@@ -4,14 +4,56 @@
 ; GPL v2.0.  See the LICENSE file in the repository.
 ; for more information.
 
+(defconst *spritz-key-iterations-v1* 5000)
+(defconst *spritz-key-iterations-v2* 500)
+
 (defun spritz-hash (fn sz)
-  "Hashes a file of the user's choice."
+  "Hashes a file of the user's choice and writes the hash to the
+current buffer. The numeric argument gives the hash size in bits."
   (interactive "fFilename:\np")
   (let ((realsz (if (> sz 1) sz 256)))
     (insert fn) (insert ": ")
     (spritz-disphash (spritz-hash-file fn realsz))
     (insert "\n")))
 
+(defun spritz-decrypt (fn pw)
+  "Load an encrypted file with the given password."
+  (interactive "fFilename:\nsPassword:")
+  (switch-to-buffer (generate-new-buffer (file-name-nondirectory fn)))
+  (let ((filename (spritz-decrypt-file fn pw)))
+    (if (> (length filename) 0)
+	(rename-buffer filename))))
+
+(defun spritz-encrypt (fn pw)
+  "Save the buffer encrypted to the given file with the given password."
+  (interactive "FFilename:\nsPassword:")
+  (let ((text (string-as-unibyte (buffer-string)))
+	(basename (string-as-unibyte (file-name-nondirectory fn))))
+    (with-temp-buffer
+      (set-buffer-multibyte nil)
+      ;; first byte is 2 for v2
+      (insert 2)
+      
+      ;; generate a random IV, random bytes, their hash, and the cipher stream
+      (let* ((iv     (spritz-generate-random))
+	     (rbytes (spritz-generate-random))
+	     (hashed (spritz-hash-seq 32 rbytes))
+	     (cipher (make-spritz-with-key iv pw *spritz-key-iterations-v2*)))
+	(mapc #'insert iv)
+	(mapc #'insert (spritz-squeeze-xor-seq cipher rbytes))
+	(mapc #'insert (spritz-squeeze-xor-seq cipher hashed))
+	
+	;; now the filename...
+	(insert (logxor (length basename) (spritz-drip cipher))) 
+	(mapc #'insert (spritz-squeeze-xor-seq cipher basename))
+	
+	;; now the contents of the buffer...
+	(mapc #'insert (spritz-squeeze-xor-seq cipher text)))
+
+        ;; now write the file..
+        (let ((coding-system-for-write 'raw-text-unix))
+	  (write-file (concat fn ".dat"))))))
+      
 
 ;; --- END OF INTERACTIVE FUNCTIONS. ---
 
@@ -19,7 +61,7 @@
 (defmacro spritz-u8+ (&rest args) `(logand (+ ,@args) 255))
 
 (defvar *reset-state* 
-   (let ((vec (make-vector 256 0)))
+   (let ((vec (make-string 256 0)))
      (dotimes (idx 256 vec)
        (aset vec idx idx))))
 
@@ -149,7 +191,7 @@
 (defun spritz-hash-seq (sz seq)
   (let* ((s     (make-spritz))
 	 (bytes (/ (+ sz 7) 8))
-	 (ans   (make-vector bytes 0)))
+	 (ans   (make-string bytes 0)))
     (spritz-absorb-seq s seq)
     (spritz-absorb-stop s)
     (spritz-absorb s bytes)
@@ -167,7 +209,7 @@
 (defun spritz-hash-file (fn sz)
   (spritz-hash-seq sz (spritz-read-binary-file fn))) 
 
-(defun spritz-key-hash (iv key)
+(defun spritz-key-hash (iv key iterations)
   (let ((s (make-spritz))
 	(keybytes (spritz-hash-seq 1024 (string-as-unibyte key))))
     ;; absorb the IV
@@ -177,16 +219,18 @@
     (spritz-absorb-seq s keybytes)
     ;; now get the hash of the IV + key
     (spritz-squeeze s keybytes)
-    ;; now, 5000 times, rehash...
-    (dotimes (cnt 5000 keybytes)
+    ;; now, many times, rehash...
+    (dotimes (_ iterations keybytes)
       (spritz-reset s)
       (spritz-absorb-seq s keybytes)
       (spritz-absorb-stop s)
-      (spritz-absorb s 128)
+      (spritz-absorb-nibble s 0)   ;; manually break out (spritz-absorb s 128)
+      (spritz-absorb-nibble s 8)
       (spritz-squeeze s keybytes))))
+      
    
-(defun make-spritz-with-key (iv key) 
-  (let ((keyhash (spritz-key-hash iv key))
+(defun make-spritz-with-key (iv key iterations) 
+  (let ((keyhash (spritz-key-hash iv key iterations))
 	(s       (make-spritz)))
     (spritz-absorb-seq s keyhash)
     s))
@@ -197,20 +241,21 @@
 			  (spritz-drip s)))))
 
 (defun spritz-decrypt-file (fn pw)
-  (let ((bindat (spritz-read-binary-file fn)))
-
-    ;; step 1 .. check that first byte is 1
-    (if (not (eql (aref bindat 0) 1))
-	(error "File is in bad format!"))
+  ;; step 1 .. read the file and check the version
+  (let* ((bindat (spritz-read-binary-file fn))
+	 (iterations    (cond
+			 ((eql (aref bindat 0) 1) *spritz-key-iterations-v1*)
+			 ((eql (aref bindat 0) 2) *spritz-key-iterations-v2*)
+			 (t                       (error "File is in a bad format!")))))
 
     ;; step 2 ... generate a spritz stream with the IV and password,
     ;;            then decrypt the header and check it...
-    (let* ((cipher (make-spritz-with-key (substring-no-properties bindat 1 5) pw))
+    (let* ((cipher (make-spritz-with-key (substring-no-properties bindat 1 5) pw iterations))
 	   (header (spritz-squeeze-xor-seq cipher (substring-no-properties bindat 5 14)))
 	   (randhash (spritz-hash-seq 32 (substring-no-properties header 0 4))))
  
       (when (not (equal randhash 
-			(vconcat (substring-no-properties header 4 8))))
+			(substring-no-properties header 4 8)))
 	(spritz-disphash randhash) (insert "   ") (spritz-disphash (substring-no-properties header 4 8)) (insert "\n")
 	(error "Bad password or corrupted file!"))
 
@@ -229,47 +274,6 @@
 	;; return the file name from within the file...
 	fname))))
 
-
-(defun spritz-load-file (fn pw)
-  "Load an encrypted file."
-  (interactive "fFilename:\nsPassword:")
-  (switch-to-buffer (generate-new-buffer (file-name-nondirectory fn)))
-  (let ((filename (spritz-decrypt-file fn pw)))
-    (if (> (length filename) 0)
-	(rename-buffer filename))))
-    
-
-
 (defun spritz-generate-random ()
   (vector (random 256) (random 256) (random 256) (random 256)))
-
-(defun spritz-encrypt (fn pw)
-  (interactive "FFilename:\nsPassword:")
-  (let ((text (string-as-unibyte (buffer-string)))
-	(basename (string-as-unibyte (file-name-nondirectory fn))))
-    (with-temp-buffer
-      (set-buffer-multibyte nil)
-      ;; first byte is 1
-      (insert 1)
-      
-      ;; generate a random IV, random bytes, their hash, and the cipher stream
-      (let* ((iv     (spritz-generate-random))
-	     (rbytes (spritz-generate-random))
-	     (hashed (spritz-hash-seq 32 rbytes))
-	     (cipher (make-spritz-with-key iv pw)))
-	(mapc #'insert iv)
-	(mapc #'insert (spritz-squeeze-xor-seq cipher rbytes))
-	(mapc #'insert (spritz-squeeze-xor-seq cipher hashed))
-	
-	;; now the filename...
-	(insert (logxor (length basename) (spritz-drip cipher))) 
-	(mapc #'insert (spritz-squeeze-xor-seq cipher basename))
-	
-	;; now the contents of the buffer...
-	(mapc #'insert (spritz-squeeze-xor-seq cipher text)))
-
-        ;; now write the file..
-        (let ((coding-system-for-write 'raw-text-unix))
-	  (write-file (concat fn ".dat"))))))
-      
     
