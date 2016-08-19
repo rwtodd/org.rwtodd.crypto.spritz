@@ -66,8 +66,6 @@ current buffer. The numeric argument gives the hash size in bits."
 ;; --- END OF INTERACTIVE FUNCTIONS. ---
 
 
-(defmacro spritz-u8+ (&rest args) `(logand (+ ,@args) 255))
-
 (defvar *reset-state* 
    (let ((vec (make-string 256 0)))
      (dotimes (idx 256 vec)
@@ -76,27 +74,41 @@ current buffer. The numeric argument gives the hash size in bits."
 (defun make-spritz ()
   (spritz-reset (make-vector 7 0)))
 
-(defmacro spritz-i (s) `(aref ,s 0))
-(defmacro spritz-set-i (s v) `(aset ,s 0 ,v))
-(defmacro spritz-j (s) `(aref ,s 1))
-(defmacro spritz-set-j (s v) `(aset ,s 1 ,v))
-(defmacro spritz-k (s) `(aref ,s 2))
-(defmacro spritz-set-k (s v) `(aset ,s 2 ,v))
-(defmacro spritz-z (s) `(aref ,s 3))
-(defmacro spritz-set-z (s v) `(aset ,s 3 ,v))
-(defmacro spritz-a (s) `(aref ,s 4))
-(defmacro spritz-set-a (s v) `(aset ,s 4 ,v))
-(defmacro spritz-w (s) `(aref ,s 5))
-(defmacro spritz-set-w (s v) `(aset ,s 5 ,v))
+(eval-when-compile 
+  (defmacro spritz-mem (s idx) `(aref (aref ,s 6) ,idx)) 
+  (defmacro spritz-set-mem (s idx v) `(aset (aref ,s 6) ,idx ,v))
 
-(defmacro spritz-inca (s) 
-  `(aset ,s 4 (+ (aref ,s 4) 1)))
+  (defmacro spritz-u8+ (&rest args) `(logand (+ ,@args) 255))
+  (defmacro spritz-mem-at-sum (s &rest args)
+    `(spritz-mem ,s (spritz-u8+ ,@args)))
 
-(defmacro spritz-incw (s) 
-  `(aset ,s 5 (spritz-u8+ (aref ,s 5) 1)))
+  (defmacro spritz-i (s) `(aref ,s 0))
+  (defmacro spritz-set-i (s v) `(aset ,s 0 ,v))
+  (defmacro spritz-j (s) `(aref ,s 1))
+  (defmacro spritz-set-j (s v) `(aset ,s 1 ,v))
+  (defmacro spritz-k (s) `(aref ,s 2))
+  (defmacro spritz-set-k (s v) `(aset ,s 2 ,v))
+  (defmacro spritz-z (s) `(aref ,s 3))
+  (defmacro spritz-set-z (s v) `(aset ,s 3 ,v))
+  (defmacro spritz-a (s) `(aref ,s 4))
+  (defmacro spritz-set-a (s v) `(aset ,s 4 ,v))
+  (defmacro spritz-w (s) `(aref ,s 5))
+  (defmacro spritz-set-w (s v) `(aset ,s 5 ,v))
 
-(defmacro spritz-mem (s idx) `(aref (aref ,s 6) ,idx)) 
-(defmacro spritz-set-mem (s idx v) `(aset (aref ,s 6) ,idx ,v))
+  (defmacro spritz-inca (s) 
+    `(aset ,s 4 (+ (aref ,s 4) 1)))
+
+  (defmacro spritz-incw (s) 
+    `(aset ,s 5 (spritz-u8+ (aref ,s 5) 1)))
+
+
+  (defmacro spritz-swap (s i1 i2)
+    "swaps two mem values in a spritz cipher"
+    `(let ((tmp (spritz-mem ,s ,i1)))
+       (spritz-set-mem ,s ,i1 (spritz-mem ,s ,i2))
+       (spritz-set-mem ,s ,i2 tmp)))
+  
+)
 
 (defun spritz-reset (s) 
   "makes a spritz vector new and empty"
@@ -105,20 +117,12 @@ current buffer. The numeric argument gives the hash size in bits."
   (aset s 6 (copy-sequence *reset-state*))
   s)
 
-(defmacro spritz-swap (s i1 i2)
-  "swaps two mem values in a spritz cipher"
-   `(let ((tmp (spritz-mem ,s ,i1)))
-     (spritz-set-mem ,s ,i1 (spritz-mem ,s ,i2))
-     (spritz-set-mem ,s ,i2 tmp)))
-
 (defun spritz-crush (s) 
   (dotimes (i 128)
     (let ((other (- 255 i)))
       (if (> (spritz-mem s i) (spritz-mem s other))
 	  (spritz-swap s i other)))))
 
-(defmacro spritz-mem-at-sum (s &rest args)
-  `(spritz-mem ,s (spritz-u8+ ,@args)))
 
 (defun spritz-update (s times) 
   (let ((i (spritz-i s))
