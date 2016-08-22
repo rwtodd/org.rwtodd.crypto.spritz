@@ -80,14 +80,19 @@ current buffer. The numeric argument gives the hash size in bits."
 	
 	;; now the contents of the buffer...
 	(mapc #'insert (spritz-squeeze-xor-seq cipher text)))
-
-        ;; now write the file..
-        (let ((coding-system-for-write 'binary))
-	  (write-file (concat fn ".dat"))))))
+      
+      ;; now write the file..
+      (let ((coding-system-for-write 'binary)
+	    (newname (concat fn ".dat")))
+	(spritz-backup-existing newname)
+	(write-file newname)))))
       
 
 ;; --- END OF INTERACTIVE FUNCTIONS. ---
 
+(defun spritz-backup-existing (fn)
+  (when (file-exists-p fn)
+    (rename-file fn (concat fn ".bak") t)))
 
 (defvar *reset-state* 
    (let ((vec (make-string 256 0)))
