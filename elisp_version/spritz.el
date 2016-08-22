@@ -4,9 +4,6 @@
 ; GPL v2.0.  See the LICENSE file in the repository.
 ; for more information.
 
-(defconst *spritz-key-iterations-v1* 5000)
-(defconst *spritz-key-iterations-v2* 500)
-
 (defun spritz-hash (fn sz)
   "Hashes a file of the user's choice and writes the hash to the
 current buffer. The numeric argument gives the hash size in bits."
@@ -252,38 +249,42 @@ current buffer. The numeric argument gives the hash size in bits."
     (aset seq idx (logxor (aref seq idx)
 			  (spritz-drip s)))))
 
-(defun spritz-decrypt-file (fn pw)
-  ;; step 1 .. read the file and check the version
-  (let* ((bindat (spritz-read-binary-file fn))
-	 (iterations    (cond
-			 ((eql (aref bindat 0) 1) *spritz-key-iterations-v1*)
-			 ((eql (aref bindat 0) 2) *spritz-key-iterations-v2*)
-			 (t                       (error "File is in a bad format!")))))
-
-    ;; step 2 ... generate a spritz stream with the IV and password,
-    ;;            then decrypt the header and check it...
-    (let* ((cipher (make-spritz-with-key (substring-no-properties bindat 1 5) pw iterations))
-	   (header (spritz-squeeze-xor-seq cipher (substring-no-properties bindat 5 14)))
-	   (randhash (spritz-hash-seq 32 (substring-no-properties header 0 4))))
+(defun spritz-decrypt-v1v2-header (bindat pw iterations)
+  "Decrypts a v1 or v2 header from BINDAT, and key PW, iterating the keyhash ITERATIONS times.
+It returns an assoc list with :cipher :idx :fname keys."
+  (let* ((cipher (make-spritz-with-key (substring-no-properties bindat 1 5) pw iterations))
+	 (header (spritz-squeeze-xor-seq cipher (substring-no-properties bindat 5 14)))
+	 (randhash (spritz-hash-seq 32 (substring-no-properties header 0 4))))
  
-      (if (not (equal randhash 
-		      (substring-no-properties header 4 8)))
-	  (error "Bad password or corrupted file!"))
+    (if (not (equal randhash 
+		    (substring-no-properties header 4 8)))
+	(error "Bad password or corrupted file!"))
 
-      ;; step 3 ... skip the filename for now...
-      (let* ((fname-length (aref header 8))
-	     (idx          (+ 14 fname-length))
-	     (fname        (spritz-squeeze-xor-seq cipher (substring-no-properties bindat 14 idx)))
-	     (bindat-len   (length bindat)))
+    ;; step 3 ... skip the filename for now...  
+    (let* ((fname-length (aref header 8))
+	   (idx          (+ 14 fname-length))
+	   (fname        (spritz-squeeze-xor-seq cipher (substring-no-properties bindat 14 idx))))
+      (list (cons :cipher cipher) (cons :idx idx) (cons :fname fname)))))      
+    
+(defun spritz-decrypt-file (fn pw)
+  (let* ((bindat (spritz-read-binary-file fn))
+	 (version (aref bindat 0))
+	 (header  (cond
+			 ((eql version 1) (spritz-decrypt-v1v2-header bindat pw 5000))
+			 ((eql version 2) (spritz-decrypt-v1v2-header bindat pw 500))
+			 (t                       (error "File is in a bad format!"))))
+         (fname (cdr (assq :fname header)))
+	 (idx   (cdr (assq :idx   header)))
+	 (cipher (cdr (assq :cipher header)))
+	 (bindat-len   (length bindat)))
 	
-	;; step 4 ... decode the data...
-	(while (< idx bindat-len)
-	  (insert (logxor (aref bindat idx)
-			  (spritz-drip cipher)))
-	  (setq idx (+ 1 idx)))
+    (while (< idx bindat-len)
+      (insert (logxor (aref bindat idx)
+		      (spritz-drip cipher)))
+      (setq idx (+ 1 idx)))
 
-	;; return the file name from within the file...
-	fname))))
+    ;; return the file name from within the file...
+    fname))
 
 (defun spritz-generate-random ()
   (vector (random 256) (random 256) (random 256) (random 256)))
