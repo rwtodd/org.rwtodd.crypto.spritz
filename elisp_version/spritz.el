@@ -33,20 +33,46 @@ current buffer. The numeric argument gives the hash size in bits."
   "Save the buffer encrypted to the given file with the given password."
   (interactive "FFilename:\nsPassword:")
   (let ((text (string-as-unibyte (buffer-string)))
+	(unipw (string-as-unibyte pw))
 	(basename (string-as-unibyte (file-name-nondirectory fn))))
     (with-temp-buffer
       (set-buffer-multibyte nil)
-      ;; first byte is 2 for v2
-      (insert 2)
       
       ;; generate a random IV, random bytes, their hash, and the cipher stream
-      (let* ((iv     (spritz-generate-random))
-	     (rbytes (spritz-generate-random))
-	     (hashed (spritz-hash-seq 32 rbytes))
-	     (cipher (make-spritz-with-key iv pw *spritz-key-iterations-v2*)))
-	(mapc #'insert iv)
-	(mapc #'insert (spritz-squeeze-xor-seq cipher rbytes))
-	(mapc #'insert (spritz-squeeze-xor-seq cipher hashed))
+      (let* ((iv       (spritz-generate-random))
+	     (rbytes   (spritz-generate-random))
+	     (rbhashed (spritz-hash-seq 32 rbytes))
+	     (tmp256   (spritz-hash-seq 2048 unipw))
+	     (cipher (make-spritz)))
+
+	;; initialize cipher..
+	(spritz-absorb-seq cipher tmp256)
+	(spritz-absorb-stop cipher)
+	(spritz-absorb cipher 4)
+	
+	;; generate IV, ensuring that the first digit isn't 1
+	(let ((encIV (copy-sequence iv)))
+	  (spritz-squeeze-xor-seq cipher encIV)
+	  (when (eql (aref encIV 0) 1)
+	    (aset encIV 0 (logxor (aref encIV 0) (aref iv 0) (+ 1 (aref iv 0))))
+	    (aset iv 0 (+ (aref iv 0) 1)))
+	  (mapc #'insert encIV))
+
+	;; now reasbsorb the iv/keyhash a few times
+	(spritz-rehash-key cipher iv tmp256)
+
+	;; put out the encrypted rbytes, then drip whatever the last
+	;; rbyte happened to be 
+	(let ((last-rbyte (aref rbytes 3)))
+	  (mapc #'insert (spritz-squeeze-xor-seq cipher rbytes))
+	  (dotimes (_ last-rbyte) (spritz-drip cipher)))
+
+	;; finally, put out the encrypted version number
+	(insert (logxor (spritz-drip cipher)
+			2))
+
+	;; write the hashed rbytes, encrypted
+	(mapc #'insert (spritz-squeeze-xor-seq cipher rbhashed))
 	
 	;; now the filename...
 	(insert (logxor (length basename) (spritz-drip cipher))) 
@@ -95,8 +121,8 @@ current buffer. The numeric argument gives the hash size in bits."
   (defmacro spritz-inca (s) 
     `(aset ,s 4 (+ (aref ,s 4) 1)))
 
-  (defmacro spritz-incw (s) 
-    `(aset ,s 5 (spritz-u8+ (aref ,s 5) 1)))
+  (defmacro spritz-incw (s amt) 
+    `(aset ,s 5 (spritz-u8+ (aref ,s 5) ,amt)))
 
 
   (defmacro spritz-swap (s i1 i2)
@@ -138,16 +164,9 @@ current buffer. The numeric argument gives the hash size in bits."
     (spritz-set-j s j)
     (spritz-set-k s k)))
 
-(defun spritz-gcd (e1 e2)
-  (if (eql e2 0)
-      e1
-    (spritz-gcd e2 (mod e1 e2))))
-
 (defun spritz-whip (s amt)
   (spritz-update s amt)
-  (spritz-incw s)
-  (while (not (eql 1 (spritz-gcd (spritz-w s) 256)))
-    (spritz-incw s)))
+  (spritz-incw s 2))
 
 (defun spritz-shuffle (s)
   (spritz-whip s 512)
@@ -163,7 +182,7 @@ current buffer. The numeric argument gives the hash size in bits."
 
 (defun spritz-absorb-nibble (s n)
   (spritz-maybe-shuffle s 128) 
-  (let ((n128 (spritz-u8+ 128 n))
+  (let ((n128 (+ 128 n))
         (sa   (spritz-a s)))
     (spritz-swap s sa n128)
     (spritz-inca s)))
@@ -203,7 +222,7 @@ current buffer. The numeric argument gives the hash size in bits."
 	 (ans   (make-string bytes 0)))
     (spritz-absorb-seq s seq)
     (spritz-absorb-stop s)
-    (spritz-absorb s bytes)
+    (spritz-absorb s (logand 255 bytes))
     (spritz-squeeze s ans)))
 
 (defun spritz-disphash (seq) 
@@ -218,7 +237,13 @@ current buffer. The numeric argument gives the hash size in bits."
 (defun spritz-hash-file (fn sz)
   (spritz-hash-seq sz (spritz-read-binary-file fn))) 
 
-(defun spritz-key-hash (iv key iterations)
+(defun spritz-squeeze-xor-seq (s seq)
+  (dotimes (idx (length seq) seq)
+    (aset seq idx (logxor (aref seq idx)
+			  (spritz-drip s)))))
+
+
+(defun spritz-v1-key-hash (iv key)
   (let ((s (make-spritz))
 	(keybytes (spritz-hash-seq 1024 (string-as-unibyte key))))
     ;; absorb the IV
@@ -229,30 +254,23 @@ current buffer. The numeric argument gives the hash size in bits."
     ;; now get the hash of the IV + key
     (spritz-squeeze s keybytes)
     ;; now, many times, rehash...
-    (dotimes (_ iterations keybytes)
+    (dotimes (_ 5000 keybytes)
       (spritz-reset s)
       (spritz-absorb-seq s keybytes)
       (spritz-absorb-stop s)
-      (spritz-absorb-nibble s 0)   ;; manually break out (spritz-absorb s 128)
-      (spritz-absorb-nibble s 8)
+      (spritz-absorb s 128)
       (spritz-squeeze s keybytes))))
       
-   
-(defun make-spritz-with-key (iv key iterations) 
-  (let ((keyhash (spritz-key-hash iv key iterations))
+(defun make-spritz-with-v1-key (iv key) 
+  (let ((keyhash (spritz-v1-key-hash iv key))
 	(s       (make-spritz)))
     (spritz-absorb-seq s keyhash)
     s))
 
-(defun spritz-squeeze-xor-seq (s seq)
-  (dotimes (idx (length seq) seq)
-    (aset seq idx (logxor (aref seq idx)
-			  (spritz-drip s)))))
-
-(defun spritz-decrypt-v1v2-header (bindat pw iterations)
-  "Decrypts a v1 or v2 header from BINDAT, and key PW, iterating the keyhash ITERATIONS times.
+(defun spritz-decrypt-v1-header (bindat pw)
+  "Decrypts a v1 header from BINDAT, and key PW.
 It returns an assoc list with :cipher :idx :fname keys."
-  (let* ((cipher (make-spritz-with-key (substring-no-properties bindat 1 5) pw iterations))
+  (let* ((cipher (make-spritz-with-v1-key (substring-no-properties bindat 1 5) pw))
 	 (header (spritz-squeeze-xor-seq cipher (substring-no-properties bindat 5 14)))
 	 (randhash (spritz-hash-seq 32 (substring-no-properties header 0 4))))
  
@@ -265,14 +283,56 @@ It returns an assoc list with :cipher :idx :fname keys."
 	   (idx          (+ 14 fname-length))
 	   (fname        (spritz-squeeze-xor-seq cipher (substring-no-properties bindat 14 idx))))
       (list (cons :cipher cipher) (cons :idx idx) (cons :fname fname)))))      
-    
+
+(defun spritz-rehash-key (s iv tmp)
+  (dotimes (_ 20)
+    (spritz-squeeze s tmp)
+    (spritz-absorb-seq s iv)
+    (spritz-absorb-stop s)
+    (spritz-absorb-seq s tmp)))
+
+(defun spritz-decrypt-header (bindat pw)
+    "Decrypts a v2+ header from BINDAT, and key PW.
+It returns an assoc list with :cipher :idx :fname keys."
+  (let ((cipher (make-spritz))
+	(tmp256 (spritz-hash-seq 2048 (string-as-unibyte pw))))
+
+    ;; initialize the cipher
+    (spritz-absorb-seq cipher tmp256)
+    (spritz-absorb-stop cipher)
+    (spritz-absorb cipher 4)
+
+    ;; decrypt the IV
+    (let ((iv  (spritz-squeeze-xor-seq cipher (substring-no-properties bindat 0 4))))
+
+      ;; reabsorb the key/hash a few times
+      (spritz-rehash-key cipher iv tmp256)
+
+      ;; read the random data, skip a random number of stream bytes,
+      ;; read the version number, and hashed random data
+      (let ((rbytes (spritz-squeeze-xor-seq cipher (substring-no-properties bindat 4 8))))
+	(dotimes (_ (aref rbytes 3)) (spritz-drip cipher))
+	(let ((vnum  (logxor (spritz-drip cipher) (aref bindat 8)))
+	      (rbhashed (spritz-squeeze-xor-seq cipher (substring-no-properties bindat 9 13))))
+
+	  ;; check that everything looks ok
+	  (when (or (not (eql vnum 2))
+		    (not (equal rbhashed
+				(spritz-hash-seq 32 rbytes))))
+	    (error "Bad pw or corrupted file!"))
+	  
+	  ;; step 3 ... skip the filename for now...  
+	  (let* ((fname-length (logxor (spritz-drip cipher) (aref bindat 13)))
+		 (idx          (+ 14 fname-length))
+		 (fname        (spritz-squeeze-xor-seq cipher (substring-no-properties bindat 14 idx))))
+	    (list (cons :cipher cipher) (cons :idx idx) (cons :fname fname))))))))      	  
+
 (defun spritz-decrypt-file (fn pw)
   (let* ((bindat (spritz-read-binary-file fn))
 	 (version (aref bindat 0))
 	 (header  (cond
-			 ((eql version 1) (spritz-decrypt-v1v2-header bindat pw 5000))
-			 ((eql version 2) (spritz-decrypt-v1v2-header bindat pw 500))
-			 (t                       (error "File is in a bad format!"))))
+			 ((eql version 1) (spritz-decrypt-v1-header bindat pw))
+			 (t               (spritz-decrypt-header bindat pw))))
          (fname (cdr (assq :fname header)))
 	 (idx   (cdr (assq :idx   header)))
 	 (cipher (cdr (assq :cipher header)))
