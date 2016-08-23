@@ -221,13 +221,19 @@ current buffer. The numeric argument gives the hash size in bits."
     (aset vec idx (spritz-drip s)))
   vec)
 
+(defun spritz-num2bytes (n &optional list)
+  "prepend N onto a LIST of bytes."
+  (cond ((eql n 0) (or list '(0)))
+	(t         (spritz-num2bytes (lsh n -8)
+				     (cons (logand 255 n) list)))))
+
 (defun spritz-hash-seq (sz seq)
   (let* ((s     (make-spritz))
 	 (bytes (/ (+ sz 7) 8))
 	 (ans   (make-string bytes 0)))
     (spritz-absorb-seq s seq)
     (spritz-absorb-stop s)
-    (spritz-absorb s (logand 255 bytes))
+    (spritz-absorb-seq s (spritz-num2bytes bytes))
     (spritz-squeeze s ans)))
 
 (defun spritz-disphash (seq) 
