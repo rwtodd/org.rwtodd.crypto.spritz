@@ -10,7 +10,6 @@ import java.io.File;
 import java.io.OutputStream;
 import java.io.IOException;
 import java.io.FilterOutputStream;
-import java.util.Arrays;
 import java.util.Optional;
 
 /** Implements an encrypted output stream via the Spritz stream cipher. 
@@ -37,44 +36,17 @@ public class SpritzOutputStream extends FilterOutputStream  {
     throws IOException
   {
      super(out);
-     final java.util.Random rnd = new java.util.Random(System.currentTimeMillis());
-     final byte[] iv = new byte[4];
-     rnd.nextBytes(iv);
-
-     // first, write the encrypted iv...
-     final byte[] encIV = Arrays.copyOf(iv, 4);
-     SpritzCipher.XORInto(encIV,  SpritzCipher.hash(32, key.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-     out.write(encIV);
-
-     cipher = SpritzCipher.cipherStream(key, iv);
-
-     // now, write 4 random bytes, and a hash of them...
-     // so we can tell if we have the right password
-     // on decryption
-     final byte[] randomBytes = new byte[4];
-     rnd.nextBytes(randomBytes);
-     final int toSkip = randomBytes[3] & 0xFF;
+     SpritzHeader header = new SpritzHeader();
+     header.Write(out, key);
+     final byte[] payloadKey = header.getPayloadKey();
      
-     final byte[] hashedBytes = SpritzCipher.hash(32,randomBytes);
-     cipher.squeezeXOR(randomBytes);
-     for(int i = 0; i < toSkip; i++) { cipher.drip(); }     
-     cipher.squeezeXOR(hashedBytes);
-     out.write(randomBytes);
-     out.write(hashedBytes);
-     
-     final byte[] realKey = new byte[64];
-     rnd.nextBytes(realKey);
-     final byte[] encKey = Arrays.copyOf(realKey, 64);
-     cipher.squeezeXOR(encKey);
-     out.write(encKey);
-     
-     cipher.reset();
-     cipher.absorb(realKey);
-     for(int i = 0; i < (2048 + (realKey[3] & 0xFF)); i++) { cipher.drip(); }     
+     cipher = new SpritzCipher();
+     cipher.absorb(payloadKey);
+     cipher.skip(2048 + (payloadKey[3] & 0xFF));     
      
      byte[] nameBytes = fname.map( n -> new File(n).getName() ).
                               orElse("").
-                              getBytes("UTF-8");
+                              getBytes(java.nio.charset.StandardCharsets.UTF_8);
      int nameLen = nameBytes.length ^ (cipher.drip() & 0xFF);
      cipher.squeezeXOR(nameBytes);
      out.write(nameLen);
@@ -95,6 +67,7 @@ public class SpritzOutputStream extends FilterOutputStream  {
     * @param b the bytes to write.
     * @param off where to start in the buffer.
     * @param len how much to write.
+    * @throws IOException when there's a problem with the write.
     */
   @Override
   public void write(byte[] b, int off, int len) 

@@ -8,11 +8,15 @@ package rwt.Spritz;
 import com.waywardcode.crypto.SpritzCipher;
 import com.waywardcode.crypto.SpritzInputStream;
 import com.waywardcode.crypto.SpritzOutputStream;
+import com.waywardcode.crypto.SpritzHeader;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.RandomAccessFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -45,6 +49,9 @@ public class Cmd {
                 case "crypt":
                     new Crypter().run(restargs);
                     break;
+                case "repass":
+                    new RePass().run(restargs);
+                    break;
                 default:
                     System.err.printf("Unknown option <%s>, valid commands are 'hash' and 'crypt'\n",args[0]);
             }
@@ -52,6 +59,69 @@ public class Cmd {
             System.err.println(e);
         }
     }
+    
+}
+
+class RePass {
+    private String oldkey;
+    private String newkey;
+    
+    String repass(File f) {
+        SpritzHeader h = new SpritzHeader();
+        byte[] headerBytes = new byte[h.getHeaderSize()];
+        
+        try (RandomAccessFile raf = new RandomAccessFile(f, "rw")) {
+
+            raf.seek(0);
+            raf.readFully(headerBytes);
+            try (InputStream is = new ByteArrayInputStream(headerBytes)) {
+                h.Read(is, oldkey);
+            } catch (Exception e) {
+                return e.toString();
+            }
+
+            try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
+                h.setIV(null);  // generate a fresh IV upon write
+                h.Write(os, newkey);
+                raf.seek(0);
+                raf.write(os.toByteArray());
+            }
+        } catch (Exception e) {
+            return e.toString();
+        }
+
+        return f.getName();
+    }
+    
+    void run(String[] args) throws IOException {
+      OptionParser op = new OptionParser();
+      try {
+          OptionSpec<String> npassOption = op.accepts("np", "the new password").
+                                              withRequiredArg().required().
+                                              ofType(String.class);
+          OptionSpec<String> opassOption = op.accepts("op", "the old password").
+                                              withRequiredArg().required().
+                                              ofType(String.class);
+          OptionSpec<File> files = op.nonOptions("the files to encrypt").ofType(File.class);
+          OptionSet os = op.parse(args);
+          
+          /* select the work we are going to do */
+          
+          oldkey = os.valueOf(opassOption);
+          newkey = os.valueOf(npassOption);
+                     
+          files.values(os).stream()
+                .parallel()
+                .map(this::repass)
+                .forEach(System.out::println); 
+          
+      } catch (Exception e) {
+          System.err.println(e);
+          System.err.println("---");
+          op.printHelpOn(System.err);
+      }
+  }
+    
     
 }
 

@@ -13,7 +13,7 @@ package com.waywardcode.crypto;
   * helper functions to cover common uses.
   * @author Richard Todd
   */
-public class SpritzCipher {
+public final class SpritzCipher {
   private int i,j,k,z,a,w;  // these are terrible names,
                             // but match the RS14.pdf description
   private final byte[] s;
@@ -160,6 +160,13 @@ public class SpritzCipher {
     return (byte)dripOne();
   }
 
+  public void skip(long amt) {
+      if (a > 0) { shuffle(); }
+      for(long idx = 0; idx < amt; ++idx) {
+          dripOne();
+      }
+  }
+  
   private void update(int amt) {
     int mi = i & 0xff;
     int mj = j & 0xff;
@@ -229,13 +236,6 @@ public class SpritzCipher {
      initSpritz.absorb(keyBytes);
      return initSpritz;
   }
-
-  /** Utility function to XOR two byte arrays */
-  public static void XORInto(byte[] dest, byte[] src) {
-      for(int i = 0; i< dest.length; i++) {
-          dest[i] ^= src[i];
-      }
-  } 
   
   /** Hash an array of bytes. Can create a hash of as many bits
     * as required, rounded up to a byte boundary.

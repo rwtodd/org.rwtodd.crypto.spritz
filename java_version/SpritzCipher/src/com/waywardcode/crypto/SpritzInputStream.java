@@ -9,15 +9,16 @@ package com.waywardcode.crypto;
 import java.io.InputStream;
 import java.io.IOException;
 import java.io.FilterInputStream;
-import java.util.Arrays;
 import java.util.Optional;
+import static com.waywardcode.crypto.SpritzUtils.*;
 
 /** Implements an encrypted input stream via the Spritz stream cipher. 
   * This class uses SpritzCipher for all the heavy lifting.
   * @author Richard Todd
   */
 public class SpritzInputStream extends FilterInputStream  {
-  private final SpritzCipher cipher;
+
+    private final SpritzCipher cipher;
   private final Optional<String> fname;
 
   /** Constructs an encrypted stream.
@@ -36,39 +37,15 @@ public class SpritzInputStream extends FilterInputStream  {
   {
      super(in);
 
-     final byte[] iv = new byte[4];
+     SpritzHeader header = new SpritzHeader();
+     header.Read(in, key);
      
-     if( readFully(in, iv) != 4 ) {
-         throw new IllegalArgumentException("Instream wasn't even long enough to contain an header!");
-     }
+     byte[] payloadKey = header.getPayloadKey();
      
-     SpritzCipher.XORInto(iv,  SpritzCipher.hash(32, key.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
- 
-     cipher = SpritzCipher.cipherStream(key, iv);
-
-     /* now decrypt the rest of the header */
-     byte[] header = new byte[72];
-     if( readFully(in, header) != 72 ) {
-         throw new IllegalArgumentException("Instream wasn't even long enough to contain an header!");
-     }
-     cipher.squeezeXOR(header,0,4);
-     for(int i = 0; i < (header[3] & 0xFF); i++) { cipher.drip(); }
-     cipher.squeezeXOR(header, 4, 68); 
-     
-     // now verify the random bytes and their hash...
-     final byte[] randomBytes = Arrays.copyOfRange(header,0,4);
-     final byte[] randomHash = Arrays.copyOfRange(header,4,8);
-     final byte[] testHash = SpritzCipher.hash(32,randomBytes);
-     if( !java.util.Arrays.equals(testHash,randomHash) ) {
-         throw new IllegalStateException("Bad Password or corrupted file!");
-     } 
-    
      // now use the key as the basis for further decryption...
-     cipher.reset();
-     cipher.absorb(header, 8, 72);
-     for(int i = 0; i < (2048+(header[11] & 0xFF)); i++) { 
-         cipher.drip();
-     }
+     cipher = new SpritzCipher();
+     cipher.absorb(payloadKey);
+     cipher.skip(2048 + (payloadKey[3]&0xFF));
      
      int fnamelen = in.read();
      if (fnamelen == -1) {
@@ -92,28 +69,10 @@ public class SpritzInputStream extends FilterInputStream  {
      * @return the embedded filename */
   public Optional<String> getFname() { return fname; }
   
-  private static int readFully(final InputStream instr,
-                               final byte[] buffer) 
-    throws java.io.IOException {
-
-      int total = buffer.length;
-      int offset = 0;
-
-      while( total > 0 ) {
-         int amount = instr.read(buffer, offset, total);
-         if (amount >= 0) {
-           offset += amount;
-           total -= amount;
-         } else {
-            total = 0;
-         }
-      } 
-      return offset;
-  }
-
 
   /** Reads a single byte.
     * @return the decrypted byte.
+    * @throws IOException when there's a problem with the read
     */
   @Override
   public int read() throws IOException {
@@ -140,7 +99,7 @@ public class SpritzInputStream extends FilterInputStream  {
   @Override
   public long skip(long n) throws IOException {
     long ans = in.skip(n);
-    for(long idx = 0; idx < ans; ++idx) { cipher.drip(); }
+    cipher.skip(n);
     return ans;
   }
 
