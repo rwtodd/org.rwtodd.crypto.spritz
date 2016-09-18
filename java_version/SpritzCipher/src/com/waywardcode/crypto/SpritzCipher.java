@@ -197,27 +197,32 @@ public class SpritzCipher {
     */
   public static SpritzCipher cipherStream(final String key, final byte[] iv) {
      SpritzCipher initSpritz = new SpritzCipher();
-     if(iv != null) {
-        initSpritz.absorb(iv);
-        initSpritz.absorbStop();
-     }
 
      byte[] keyBytes;
      try {
-       keyBytes  = hash(1024, key.getBytes("UTF-8"));
+       keyBytes  = hash(512, key.getBytes(java.nio.charset.StandardCharsets.UTF_8));
      } catch(Exception e) {
         System.err.println(e.toString());
-        keyBytes = hash(1024, key.getBytes());
+        keyBytes = hash(512, key.getBytes());
      }
 
-     initSpritz.absorb(keyBytes);
-     keyBytes = initSpritz.squeeze(128);
-     for(int i = 0; i < 5000; ++i) {
+     int iterations = 20000 + (iv[3] & 0xFF);
+     for(int i = 0; i < iterations; ++i) {
          initSpritz.reset();
-         initSpritz.absorb(keyBytes);
+         initSpritz.absorb(iv);
          initSpritz.absorbStop();
-         initSpritz.absorb((byte)128);
+         initSpritz.absorb(keyBytes);
          initSpritz.squeeze(keyBytes);
+         iv[0] = (byte)((iv[0] & 0xFF) + 1);
+         if(iv[0] == 0) {
+             iv[1] = (byte)((iv[1] & 0xFF) + 1);
+             if(iv[1] == 0) {
+                iv[2] = (byte)((iv[2] & 0xFF) + 1);
+                if(iv[2] == 0) {
+                    iv[3] = (byte)((iv[3] & 0xFF) + 1);                
+                }
+             }
+         }
      }
      
      initSpritz.reset();
@@ -225,6 +230,13 @@ public class SpritzCipher {
      return initSpritz;
   }
 
+  /** Utility function to XOR two byte arrays */
+  public static void XORInto(byte[] dest, byte[] src) {
+      for(int i = 0; i< dest.length; i++) {
+          dest[i] ^= src[i];
+      }
+  } 
+  
   /** Hash an array of bytes. Can create a hash of as many bits
     * as required, rounded up to a byte boundary.
     * @param bits how many bits wide to make the hash.

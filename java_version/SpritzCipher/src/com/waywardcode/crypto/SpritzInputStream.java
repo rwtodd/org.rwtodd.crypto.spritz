@@ -36,30 +36,45 @@ public class SpritzInputStream extends FilterInputStream  {
   {
      super(in);
 
-     final byte[] header = new byte[14];
+     final byte[] iv = new byte[4];
      
-     if( readFully(in, header) != 14 ) {
+     if( readFully(in, iv) != 4 ) {
          throw new IllegalArgumentException("Instream wasn't even long enough to contain an header!");
      }
-
-     if(header[0] != 1) {
-         throw new IllegalArgumentException("Header: bad version!");         
-     }
+     
+     SpritzCipher.XORInto(iv,  SpritzCipher.hash(32, key.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
  
-     cipher = SpritzCipher.cipherStream(key, Arrays.copyOfRange(header,1,5));
+     cipher = SpritzCipher.cipherStream(key, iv);
 
      /* now decrypt the rest of the header */
-     cipher.squeezeXOR(header, 5, 9);  
+     byte[] header = new byte[72];
+     if( readFully(in, header) != 72 ) {
+         throw new IllegalArgumentException("Instream wasn't even long enough to contain an header!");
+     }
+     cipher.squeezeXOR(header,0,4);
+     for(int i = 0; i < (header[3] & 0xFF); i++) { cipher.drip(); }
+     cipher.squeezeXOR(header, 4, 68); 
      
      // now verify the random bytes and their hash...
-     final byte[] randomBytes = Arrays.copyOfRange(header,5,9);
-     final byte[] randomHash = Arrays.copyOfRange(header,9,13);
+     final byte[] randomBytes = Arrays.copyOfRange(header,0,4);
+     final byte[] randomHash = Arrays.copyOfRange(header,4,8);
      final byte[] testHash = SpritzCipher.hash(32,randomBytes);
      if( !java.util.Arrays.equals(testHash,randomHash) ) {
          throw new IllegalStateException("Bad Password or corrupted file!");
      } 
     
-     final byte fnamelen = header[13];
+     // now use the key as the basis for further decryption...
+     cipher.reset();
+     cipher.absorb(header, 8, 72);
+     for(int i = 0; i < (2048+(header[11] & 0xFF)); i++) { 
+         cipher.drip();
+     }
+     
+     int fnamelen = in.read();
+     if (fnamelen == -1) {
+         throw new IllegalArgumentException("Instream wasn't even long enough to contain an header!");
+     }
+     fnamelen  ^= (cipher.drip() & 0xFF);     
      if( fnamelen > 0 ) {
         final byte[] fnameBytes = new byte[fnamelen];
         if( readFully(in, fnameBytes) != fnamelen ) {
