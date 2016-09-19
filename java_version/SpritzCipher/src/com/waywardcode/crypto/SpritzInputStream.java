@@ -5,117 +5,62 @@
  */
 package com.waywardcode.crypto;
 
-
+import static com.waywardcode.crypto.SpritzUtils.readFully;
+import java.util.zip.InflaterInputStream;
 import java.io.InputStream;
 import java.io.IOException;
-import java.io.FilterInputStream;
 import java.util.Optional;
-import static com.waywardcode.crypto.SpritzUtils.*;
 
-/** Implements an encrypted input stream via the Spritz stream cipher. 
-  * This class uses SpritzCipher for all the heavy lifting.
-  * @author Richard Todd
-  */
-public class SpritzInputStream extends FilterInputStream  {
-
-    private final SpritzCipher cipher;
-  private final Optional<String> fname;
-
-  /** Constructs an encrypted stream.
-    * This method reads a 4-byte random initialization
-    * vector, and creates a cipher stream with the IV and
-    * the given key.  It then decrypts 4 bytes, and creates
-    * 32-bit hash of those bytes.  If the next 4 decrypted
-    * bytes match the hash, we assume we have the correct
-    * decryption stream. 
-    * @param key the password to use. It is converted to UTF-8 bytes.
-    * @param in the earlier InputStream in the chain.
-    * @throws java.io.IOException if there is a problem reading from 'in'
-    */
-  public SpritzInputStream(final String key, final InputStream in) 
-    throws IOException
-  {
-     super(in);
-
-     SpritzHeader header = new SpritzHeader();
-     header.Read(in, key);
-     
-     byte[] payloadKey = header.getPayloadKey();
-     
-     // now use the key as the basis for further decryption...
-     cipher = new SpritzCipher();
-     cipher.absorb(payloadKey);
-     cipher.skip(2048 + (payloadKey[3]&0xFF));
-     
-     int fnamelen = in.read();
-     if (fnamelen == -1) {
-         throw new IllegalArgumentException("Instream wasn't even long enough to contain an header!");
-     }
-     fnamelen  ^= (cipher.drip() & 0xFF);     
-     if( fnamelen > 0 ) {
-        final byte[] fnameBytes = new byte[fnamelen];
-        if( readFully(in, fnameBytes) != fnamelen ) {
-            throw new IllegalStateException("Instream corrupted!");
-        }
-        cipher.squeezeXOR(fnameBytes);
-        fname = Optional.of(new String(fnameBytes,"UTF-8"));
-     } else {
-        fname = Optional.empty();
-     }
+/**
+ * This is the main class used to read an encrypted stream. It
+ * understands the header format, the embedded filename, and
+ * the zlib compression.  If you don't want compression, use
+ * a SpritzDecrypter directly.  If you don't even want a header,
+ * get a SpritzCipher.cipherStream().
+ * @author richard
+ */
+public class SpritzInputStream implements AutoCloseable {
+    private final InflaterInputStream inflater;
+    private final SpritzDecrypter decrypter;
+    private final Optional<String> internalName;
     
-  }
+    /**
+     * Retrieves the original, pre-encryption filename, if it was
+     * stored in the encrypted file.
+     * @return The original filename.
+     */
+    public Optional<String> getOriginalName() { return internalName; }
+    
+    public SpritzInputStream(String key, InputStream is) throws IOException {
+        decrypter = new SpritzDecrypter(key, is);
 
-  /** Retrieves the filename that was stored in the encrypted stream.
-     * @return the embedded filename */
-  public Optional<String> getFname() { return fname; }
-  
+        int fnamelen = decrypter.read();
+        if (fnamelen == -1) {
+            throw new IllegalArgumentException("Instream wasn't even long enough to contain an header!");
+        }
+        if (fnamelen > 0) {
+            final byte[] fnameBytes = new byte[fnamelen];
+            if (readFully(decrypter, fnameBytes) != fnamelen) {
+                throw new IllegalStateException("Instream corrupted!");
+            }
+            internalName = Optional.of(new String(fnameBytes, java.nio.charset.StandardCharsets.UTF_8));
+        } else {
+            internalName = Optional.empty();
+        }
 
-  /** Reads a single byte.
-    * @return the decrypted byte.
-    * @throws IOException when there's a problem with the read
-    */
-  @Override
-  public int read() throws IOException {
-     return in.read() ^ cipher.drip();
-  }
- 
-  /** Reads a series of bytes.
-    * @param b the buffer to read into.
-    * @param off offset into the buffer.
-    * @param len the maximum amount of bytes to read.
-    * @return the number of bytes read.
-    */
-  @Override
-  public int read(byte[] b, int off, int len) throws IOException {
-    int amt = in.read(b,off,len);
-    cipher.squeezeXOR(b,off,amt);
-    return amt; 
-  } 
-
-  /** Skips over some input bytes.
-    * @param n the number of bytes to skip.
-    * @return the actual number skipped (may be less than n)
-    */
-  @Override
-  public long skip(long n) throws IOException {
-    long ans = in.skip(n);
-    cipher.skip(n);
-    return ans;
-  }
-
-
-  /** Throws an exception since we don't support mark/reset.
-    */
-  @Override
-  public void reset() throws IOException {
-    throw new IOException("mark/reset not supported on SpritzInputStreams!");
-  }
-
-  /** Returns false since we don't support mark/reset. 
-    * @return false.
-    */
-  @Override
-  public boolean markSupported() { return false; }
-
+        inflater = new InflaterInputStream(decrypter);
+    }
+    
+    /**
+     * Gets an InputStream for decompressed, decrypted data.
+     * @return An InputStream which can be used to read decrypted bytes 
+     */
+    public InputStream getInputStream() { return inflater; }
+    
+    @Override
+    public void close() throws Exception {
+        inflater.close();
+        decrypter.close();
+    }
+    
 }
-

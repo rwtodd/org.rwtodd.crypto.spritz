@@ -2,6 +2,7 @@
 
 <?import java.lang.*?>
 <?import java.util.*?>
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.*?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
@@ -9,7 +10,7 @@
 
 <VBox  xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/8"  
            id="main" fx:controller="rwt.spritz.MainWinController" 
-           prefHeight="600" prefWidth="800"  fx:id="root">
+           prefHeight="600" prefWidth="800" fx:id="root">
     <children>
         <MenuBar> 
             <menus>
@@ -23,12 +24,15 @@
             </Menu>
             </menus>
         </MenuBar>
-        <HBox>
+        <HBox spacing="10" >
+            <padding><Insets left="10" right="10" top="10" bottom="10"  /></padding>
             <children>
             <Label text="Password:"></Label>
-            <TextField fx:id="passw"></TextField>
+            <TextField HBox.hgrow="ALWAYS"  fx:id="passw"></TextField>
             </children>
         </HBox> 
-        <HTMLEditor fx:id="editor" ></HTMLEditor>
+        <TextArea  VBox.vgrow="ALWAYS" fx:id="editor">
+            <padding><Insets top="10" left="10" right="10" bottom="10" /></padding>
+        </TextArea>
     </children>
 </VBox>

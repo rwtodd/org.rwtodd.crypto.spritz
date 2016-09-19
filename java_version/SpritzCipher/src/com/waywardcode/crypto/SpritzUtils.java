@@ -9,9 +9,18 @@ import java.io.InputStream;
 
 /**
  * A static class of utility methods.
- * @author richa
+ * @author richard
  */
 public class SpritzUtils {
+    
+   /**
+    * Read enough bytes to fill the buffer, or until the end 
+    * of the stream, whichever comes first.
+    * @param instr The input stream to use
+    * @param buffer The buffer to fill
+    * @return the number of bytes read
+    * @throws java.io.IOException if the underlying read fails
+    */
    public static int readFully(final InputStream instr,
                                final byte[] buffer) 
     throws java.io.IOException {

@@ -8,15 +8,15 @@ package com.waywardcode.crypto;
 import static com.waywardcode.crypto.SpritzUtils.*;
 import java.io.OutputStream;
 import java.io.InputStream;
-import java.io.IOError;
 import java.util.Random;
 import java.io.IOException;
 import java.util.Arrays;
 
 /**
- * A class to encapsulate the header of a Sprtiz-encrypted 
- * file.
- * @author richa
+ * A class to encapsulate the header of a Spritz-encrypted 
+ * file.  It can read and write a header, and for password-changing
+ * purposes, it does both.
+ * @author richard
  */
 public class SpritzHeader {
     private final Random rnd;
@@ -42,11 +42,7 @@ public class SpritzHeader {
         return payloadKey; 
     }
     public void setPayloadKey(byte[] plk) { payloadKey = Arrays.copyOf(plk, 64); }
-    
-//    private String innerFileName;
-//    public String getInnerFileName() { return innerFileName; }
-//    public void setInnerFileName(String n) { innerFileName = n; }
-    
+        
     public SpritzHeader() {
         rnd = new java.util.Random(System.currentTimeMillis());
         IV = null;

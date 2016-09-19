@@ -11,7 +11,7 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.layout.VBox;
-import javafx.scene.web.HTMLEditor;
+import javafx.scene.control.TextArea;
 import javafx.stage.FileChooser;
 import java.io.File;
 import com.waywardcode.crypto.*;
@@ -33,7 +33,7 @@ public class MainWinController implements Initializable {
     private TextField passw;
     
     @FXML
-    private HTMLEditor editor;
+    private TextArea editor;
 
     @FXML
     private void menuSave(ActionEvent e) {
@@ -42,7 +42,7 @@ public class MainWinController implements Initializable {
         File file = loadedFile;
         if(file == null) {
             FileChooser fileChooser = new FileChooser();
-            fileChooser.setTitle("Save HTML File");
+            fileChooser.setTitle("Save Text File");
             file = fileChooser.showSaveDialog(root.getScene().getWindow());
         }
         if(file == null) return;
@@ -62,9 +62,9 @@ public class MainWinController implements Initializable {
         try (
                 final java.io.FileOutputStream fos = new java.io.FileOutputStream(file);
                 final SpritzOutputStream sos = new SpritzOutputStream(Optional.empty(), passw.getText(), fos);
-                final java.io.OutputStreamWriter wtr = new java.io.OutputStreamWriter(sos,java.nio.charset.StandardCharsets.UTF_8)
+                final java.io.OutputStreamWriter wtr = new java.io.OutputStreamWriter(sos.getOutputStream(),java.nio.charset.StandardCharsets.UTF_8)
             ) {
-            wtr.write(editor.getHtmlText());
+            wtr.write(editor.getText());
         } catch(Exception ex) {
             System.err.println(ex);
             return;
@@ -83,16 +83,16 @@ public class MainWinController implements Initializable {
             try(
                 final java.io.FileInputStream fin = new java.io.FileInputStream(file);
                 final SpritzInputStream sin = new SpritzInputStream(passw.getText(),fin);
-                final java.io.InputStreamReader isr = new java.io.InputStreamReader(sin,java.nio.charset.StandardCharsets.UTF_8);
+                final java.io.InputStreamReader isr = new java.io.InputStreamReader(sin.getInputStream(),java.nio.charset.StandardCharsets.UTF_8);
                 final java.io.BufferedReader rdr = new java.io.BufferedReader(isr)
                ) {
-                final StringBuffer sb = new StringBuffer();
+                final StringBuilder sb = new StringBuilder();
                 String line = rdr.readLine();
                 while(line != null) {
-                    sb.append(line);
+                    sb.append(line).append('\n');
                     line = rdr.readLine();
                 }
-                editor.setHtmlText(sb.toString());
+                editor.setText(sb.toString());
                 loadedFile = file;
             } catch (Exception ex) {
                 System.err.println(ex);
@@ -107,7 +107,7 @@ public class MainWinController implements Initializable {
     
     @Override
     public void initialize(URL url, ResourceBundle rb) {
-        editor.setHtmlText("<b>hi</b> there");
+        editor.setText("*hi* there");
     }    
     
 }

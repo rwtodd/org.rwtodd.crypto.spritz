@@ -24,7 +24,6 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Stream;
-import java.util.zip.*;
 import joptsimple.OptionSpec;
 
 /**
@@ -203,17 +202,16 @@ class Crypter {
  
   private String decrypt(final File f) {
     final String path = f.getPath();
-    String report = "";
+    String report;
     
-    try(final SpritzInputStream istream = new SpritzInputStream(key, new FileInputStream(f));
-        final InflaterInputStream iflstr = new InflaterInputStream(istream)) {
-       final String decryptedName = changedir(istream.getFname().
+    try(final SpritzInputStream spritz = new SpritzInputStream(key, new FileInputStream(f))) {
+       final String decryptedName = changedir(spritz.getOriginalName().
                                                   orElse( path.endsWith((".dat")) ? 
                                                                    path.substring(0,path.length() - 4): 
                                                                    path + ".unenc" ));
         report = String.format("%s -> %s",path, decryptedName);
         try(final FileOutputStream ostream = new FileOutputStream(decryptedName)) {
-            copyStream(iflstr,ostream);
+            copyStream(spritz.getInputStream(),ostream);
         }
     } catch (Exception e) {
       report = String.format("%s: error: %s", path, e);
@@ -224,10 +222,10 @@ class Crypter {
 
   private String check(final File f) {
     final String path = f.getPath();
-    String report = "";
+    String report;
   
-    try(final SpritzInputStream istream = new SpritzInputStream(key, new FileInputStream(f))) {
-       final String decryptedName = istream.getFname().orElse( "<none stored!>" );
+    try(final SpritzInputStream spritz = new SpritzInputStream(key, new FileInputStream(f))) {
+       final String decryptedName = spritz.getOriginalName().orElse( "<none stored!>" );
        report = String.format("%s is OK, name in file is %s",path, decryptedName);
     } catch (Exception e) {
       report = String.format("%s: error: %s", path, e);
@@ -240,15 +238,12 @@ class Crypter {
     final String path = f.getPath();
     final String encryptedName = changedir(pathNoExt(path) + ".dat");
     String report = String.format("%s -> %s",path, encryptedName);
-    final Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION);
     try(final InputStream istream = new FileInputStream(f);
-        final OutputStream ostream = new SpritzOutputStream(Optional.of(f.getName()), 
-                                                            key, 
-                                                            new FileOutputStream(encryptedName));
-        final DeflaterOutputStream dflstr = new DeflaterOutputStream(ostream,deflater)
+        final SpritzOutputStream spritz = new SpritzOutputStream(Optional.of(f.getName()), 
+                                                                  key, 
+                                                                  new FileOutputStream(encryptedName))
        ) {
-      copyStream(istream,dflstr);
-      dflstr.finish();
+      copyStream(istream, spritz.getOutputStream());
     } catch (Exception e) {
       report = String.format("%s: error: %s", path, e);
     }
