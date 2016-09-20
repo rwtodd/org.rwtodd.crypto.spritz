@@ -5,6 +5,7 @@
  */
 package com.waywardcode.crypto;
 
+import static com.waywardcode.crypto.SpritzUtils.*;
 
 /** Implements the Spritz stream cipher. 
   * This class does the actual calculation, and
@@ -248,7 +249,7 @@ public final class SpritzCipher {
      final SpritzCipher hasher = new SpritzCipher();
      hasher.absorb(data);
      hasher.absorbStop();
-     hasher.absorb( (byte)bytes );
+     absorbIntBytes(hasher, bytes);
      return hasher.squeeze(bytes);
   }
 
@@ -275,7 +276,7 @@ public final class SpritzCipher {
      }
 
      hasher.absorbStop();
-     hasher.absorb( (byte)bytes );
+     absorbIntBytes(hasher, bytes);
      return hasher.squeeze(bytes);
   }
   

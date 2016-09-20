@@ -13,6 +13,25 @@ import java.io.InputStream;
  */
 public class SpritzUtils {
     
+    /** 
+     * convert an integer into a big-endian array of component bytes, absorbing
+     * it into the given spritz sponge.  It would take an obscenely-large hash
+     * to need more than 2 bytes, so this recursive implementation should be
+     * ok.  It's the cleanest-looking version of the algorithm I could derive,
+     * without building a stack-like collection of bytes.
+     * @param c The cipher to use
+     * @param n The value to split into bytes
+     */
+    public static void absorbIntBytes(SpritzCipher c, int n) {
+         if(n <= 255) {
+             c.absorb((byte)n);
+         } else {      
+            absorbIntBytes(c, (n >> 8));
+            c.absorb((byte)(n & 0xff));
+         }
+    }
+    
+    
    /**
     * Read enough bytes to fill the buffer, or until the end 
     * of the stream, whichever comes first.
