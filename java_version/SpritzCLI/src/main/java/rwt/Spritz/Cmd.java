@@ -59,6 +59,27 @@ public class Cmd {
         }
     }
     
+    
+    /** This is a utility function that can be shared by any sub-commands
+     * needing to get a password.
+     * @param prompt A string to display to the user
+     * @param confirm Should it make the user re-type for confirmation?
+     * @return the typed string
+     */
+     public static String getPassword(String prompt, boolean confirm) {
+        java.io.Console c = System.console();
+        if(c == null) throw new IllegalStateException("Can't ask for password without a console!");
+        char[] pwchars = c.readPassword(prompt);
+        if(confirm) {
+            char[] pwchars2 = c.readPassword("[Confirm] " + prompt);
+            if(!Arrays.equals(pwchars, pwchars2)) {
+                c.printf("Passwords didn't match!\n\n");
+                return getPassword(prompt, confirm);
+            }
+        }
+        return new String(pwchars);
+    }
+
 }
 
 class RePass {
@@ -96,10 +117,10 @@ class RePass {
       OptionParser op = new OptionParser();
       try {
           OptionSpec<String> npassOption = op.accepts("np", "the new password").
-                                              withRequiredArg().required().
+                                              withRequiredArg().
                                               ofType(String.class);
           OptionSpec<String> opassOption = op.accepts("op", "the old password").
-                                              withRequiredArg().required().
+                                              withRequiredArg().
                                               ofType(String.class);
           OptionSpec<File> files = op.nonOptions("the files to encrypt").ofType(File.class);
           OptionSet os = op.parse(args);
@@ -107,8 +128,15 @@ class RePass {
           /* select the work we are going to do */
           
           oldkey = os.valueOf(opassOption);
+          if(oldkey == null) {
+              oldkey = Cmd.getPassword("Old Password: ", false);
+          }
+          
           newkey = os.valueOf(npassOption);
-                     
+          if(newkey == null) {
+              newkey = Cmd.getPassword("New Password: ", true);
+          }
+          
           files.values(os).stream()
                 .parallel()
                 .map(this::repass)
@@ -297,7 +325,7 @@ class Crypter {
           
           key = os.valueOf(passOption);
           if(key == null) { 
-              key = getPassword(os.has(decryptOption)||os.has(checkOption));
+              key = Cmd.getPassword("Password: ", !(os.has(decryptOption)||os.has(checkOption)));
           } 
           
           if(os.has(odirOption)) {
@@ -333,20 +361,6 @@ class Crypter {
               answer = new File(odir.get(), new File(path).getName()).getPath();
           }
           return answer;
-    }
-
-    private String getPassword(boolean decrypting) {
-        java.io.Console c = System.console();
-        if(c == null) throw new IllegalStateException("Can't ask for password without a console!");
-        char[] pwchars = c.readPassword("Password: ");
-        if(!decrypting) {
-            char[] pwchars2 = c.readPassword("Confirm Password: ");
-            if(!Arrays.equals(pwchars, pwchars2)) {
-                c.printf("Passwords didn't match!\n\n");
-                return getPassword(decrypting);
-            }
-        }
-        return new String(pwchars);
     }
 
 }
