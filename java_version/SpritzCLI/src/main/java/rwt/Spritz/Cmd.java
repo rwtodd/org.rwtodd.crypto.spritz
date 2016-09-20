@@ -280,7 +280,7 @@ class Crypter {
       OptionParser op = new OptionParser();
       try {
           OptionSpec<String> passOption = op.accepts("p", "the password").
-                                              withRequiredArg().required().
+                                              withRequiredArg().
                                               ofType(String.class);
           OptionSpec decryptOption = op.accepts("d", "decrypt files instead of encrypting them");
           OptionSpec checkOption = op.accepts("c", "just check if you know the password");
@@ -296,7 +296,10 @@ class Crypter {
           if(os.has(checkOption)) { worker =  this::check; }
           
           key = os.valueOf(passOption);
-           
+          if(key == null) { 
+              key = getPassword(os.has(decryptOption)||os.has(checkOption));
+          } 
+          
           if(os.has(odirOption)) {
               odir = Optional.of(os.valueOf(odirOption));
           } else {
@@ -330,6 +333,20 @@ class Crypter {
               answer = new File(odir.get(), new File(path).getName()).getPath();
           }
           return answer;
+    }
+
+    private String getPassword(boolean decrypting) {
+        java.io.Console c = System.console();
+        if(c == null) throw new IllegalStateException("Can't ask for password without a console!");
+        char[] pwchars = c.readPassword("Password: ");
+        if(!decrypting) {
+            char[] pwchars2 = c.readPassword("Confirm Password: ");
+            if(!Arrays.equals(pwchars, pwchars2)) {
+                c.printf("Passwords didn't match!\n\n");
+                return getPassword(decrypting);
+            }
+        }
+        return new String(pwchars);
     }
 
 }
