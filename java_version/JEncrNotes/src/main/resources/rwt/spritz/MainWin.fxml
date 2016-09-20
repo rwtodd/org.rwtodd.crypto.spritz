@@ -8,31 +8,39 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.web.HTMLEditor?>
 
-<VBox  xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/8"  
+<BorderPane  xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/8"  
            id="main" fx:controller="rwt.spritz.MainWinController" 
            prefHeight="600" prefWidth="800" fx:id="root">
-    <children>
+    <top>
+        <VBox>
         <MenuBar> 
             <menus>
             <Menu text="File">
                 <items>
                     <MenuItem text="Open" onAction="#menuOpen" ></MenuItem>
                     <MenuItem text="Save" onAction="#menuSave" ></MenuItem>
+                    <MenuItem text="Edit Password" onAction="#menuEditPW"></MenuItem>
+                    <MenuItem text="Render Markdown" onAction="#menuRender">
+                    </MenuItem>
                     <SeparatorMenuItem />
                     <MenuItem text="Exit" onAction="#menuExit" ></MenuItem>
                 </items>
             </Menu>
             </menus>
         </MenuBar>
-        <HBox spacing="10" >
+        <HBox fx:id="passwField" spacing="10" >
             <padding><Insets left="10" right="10" top="10" bottom="10"  /></padding>
             <children>
             <Label text="Password:"></Label>
-            <TextField HBox.hgrow="ALWAYS"  fx:id="passw"></TextField>
+            <PasswordField HBox.hgrow="ALWAYS" fx:id="passw"></PasswordField>
             </children>
         </HBox> 
+        </VBox>
+    </top>
+    <center>
         <TextArea  VBox.vgrow="ALWAYS" fx:id="editor">
             <padding><Insets top="10" left="10" right="10" bottom="10" /></padding>
         </TextArea>
-    </children>
-</VBox>
+    </center>
+    <bottom><Button maxWidth="9999" onAction="#menuRender">Render Markdown</Button></bottom>               
+</BorderPane>

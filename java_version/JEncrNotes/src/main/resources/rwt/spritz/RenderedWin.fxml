@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.*?>
+<?import java.util.*?>
+<?import javafx.scene.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.web.WebView?>
+
+<BorderPane xmlns:fx="http://javafx.com/fxml/1"   
+            fx:controller="rwt.spritz.RenderedWinController">
+    <bottom>
+        <Button maxWidth="9999" onAction="#exitPressed">Exit Markdown Viewer</Button>
+    </bottom>
+    <center>
+        <WebView fx:id="webview">
+        </WebView>
+    </center>    
+</BorderPane>

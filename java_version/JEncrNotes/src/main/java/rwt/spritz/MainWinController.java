@@ -10,13 +10,17 @@ import java.util.ResourceBundle;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.control.TextArea;
+import javafx.scene.layout.HBox;
 import javafx.stage.FileChooser;
 import java.io.File;
 import com.waywardcode.crypto.*;
 import java.util.Optional;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Scene;
 import javafx.scene.control.TextField;
+import javafx.stage.Stage;
 
 /**
  *
@@ -27,7 +31,10 @@ public class MainWinController implements Initializable {
     private File loadedFile; /* what do we have loaded? */
     
     @FXML
-    private VBox root;
+    private BorderPane root;
+    
+    @FXML
+    private HBox passwField;
     
     @FXML
     private TextField passw;
@@ -70,6 +77,8 @@ public class MainWinController implements Initializable {
             return;
         }
         loadedFile = file;
+        passw.editableProperty().set(false); // lock it down once it's in use...
+        passwField.visibleProperty().set(false);
     }
     
     @FXML
@@ -93,10 +102,34 @@ public class MainWinController implements Initializable {
                     line = rdr.readLine();
                 }
                 editor.setText(sb.toString());
+                passw.editableProperty().set(false); // lock it down once it's right...
+                passwField.visibleProperty().set(false);
                 loadedFile = file;
             } catch (Exception ex) {
-                System.err.println(ex);
+                editor.setText(ex.toString());
             }
+        }
+    }
+    
+    @FXML
+    private void menuEditPW(ActionEvent e) {
+        passwField.visibleProperty().set(true);
+        passw.editableProperty().set(true);
+    }
+    
+    @FXML
+    private void menuRender(ActionEvent e) {
+        try {
+            FXMLLoader loader = new FXMLLoader(
+                    getClass().getResource("RenderedWin.fxml")
+            );
+            Scene myScene = root.getScene();
+            Scene renderScene = new Scene(loader.load());
+            RenderedWinController rwc = loader.getController();
+            rwc.setData(myScene, editor.getText());
+            ((Stage) editor.getScene().getWindow()).setScene(renderScene);
+        } catch (Exception except) {
+            // guess it didn't work :(
         }
     }
     
@@ -108,6 +141,8 @@ public class MainWinController implements Initializable {
     @Override
     public void initialize(URL url, ResourceBundle rb) {
         editor.setText("*hi* there");
+        // remove the password field from the layout when I make it invisible
+        passwField.managedProperty().bind(passwField.visibleProperty());
     }    
     
 }
