@@ -125,7 +125,8 @@ class RePass {
 }
 
 class Hasher { 
-  private int bits;
+  private int bits; // how many bits of hash?
+  private boolean hex; // display in hex?
   
   private String doOneFile(File f) {
     final StringBuilder answer = new StringBuilder();
@@ -134,7 +135,11 @@ class Hasher {
     try(FileInputStream fstream = new FileInputStream(f)) {
         
       final byte[] hash = SpritzCipher.hash(bits, fstream);
-      for(final byte b: hash) { answer.append(String.format("%02x",b)); }
+      if (hex) {
+         for(final byte b: hash) { answer.append(String.format("%02x",b)); }
+      } else {
+         answer.append(java.util.Base64.getEncoder().encodeToString(hash));
+      }
 
     } catch (IOException e) {
       answer.append("error! ").append(e);
@@ -164,9 +169,12 @@ class Hasher {
                                               withRequiredArg().
                                               ofType(Integer.class).
                                               defaultsTo(256);
+          OptionSpec dispHex = op.accepts("h", "display hashes as hexadecimal");
+
           OptionSpec<File> files = op.nonOptions("the files to hash").ofType(File.class);
           OptionSet os = op.parse(args);
           bits = os.valueOf(sizeOption);
+          hex = os.has(dispHex);
           files.values(os).stream()
                 .parallel()
                 .flatMap(this::doOneArgument)
