@@ -50,7 +50,7 @@ object Hash {
 
      var flist = parseArgs(args)
      if(flist.isEmpty) { flist = List("-") }
-     flist.par.map(doOne(size,encoder)).foreach(println)
+     flist.par.foreach { f => println(doOne(size,encoder)(f)) }
   }
 
 }

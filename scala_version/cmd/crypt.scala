@@ -127,7 +127,7 @@ object Crypt {
      val printout: String=>Unit = if (flist.isEmpty) (x) => { } else println
 
      if (flist.isEmpty) { flist = List("-") }
-     flist.par.map(process).foreach(printout(_))
+     flist.par.foreach { f => printout(process(f)) }
   }
 
 }
