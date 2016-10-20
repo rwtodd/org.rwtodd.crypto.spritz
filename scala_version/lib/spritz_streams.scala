@@ -4,46 +4,30 @@ package com.waywardcode.crypto
 // The license is GPL, see the LICENSE file in the repository.
 
 import java.io.File
+import java.io.OutputStream
+import java.io.InputStream
+import java.io.IOException
+import java.util.Arrays
+import java.nio.charset.StandardCharsets.UTF_8
+import java.util.zip.InflaterInputStream;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.Deflater;
+
 
 /** Implements an encrypted output stream via the Spritz stream cipher. 
   * This class uses SpritzCipher for all the heavy lifting.
   * @author Richard Todd
   */
-class SpritzOutputStream(fname: Option[String],
+class SpritzEncrypter(fname: Option[String],
                          key: String, 
                          os: java.io.OutputStream)
  extends java.io.FilterOutputStream(os) {
-     private def init : SpritzCipher = {
-	     val rnd = new java.util.Random(System.currentTimeMillis)
-	     val iv = new Array[Byte](4)
-	     rnd.nextBytes(iv)
-	     val cipher = SpritzCipher.cipherStream(key,iv) 
-             val version = 1
-             os.write(version)
-	     os.write(iv)
-
-	     val randomBytes = new Array[Byte](4)
-	     rnd.nextBytes(randomBytes)
-	     val hashedBytes = SpritzCipher.hash(32,randomBytes)
-             val nameBytes = fname.map(new File(_).getName()).
-                                   getOrElse("").
-                                   getBytes("UTF-8")
-
-	     cipher.squeezeXOR(randomBytes)
-	     cipher.squeezeXOR(hashedBytes)
-             val namelen = (nameBytes.length  ^ cipher.drip())
-             cipher.squeezeXOR(nameBytes)
-
-	     os.write(randomBytes)
-	     os.write(hashedBytes)
-             os.write(namelen)
-	     os.write(nameBytes)
-
-             cipher
-     }
-
-     private val cipher  = init
-
+     private val header = SpritzHeader.random
+     header.write(os, key)
+     private val cipher = new SpritzCipher
+     cipher.absorb(header.payloadKey)
+     cipher.skip(2048 + (header.payloadKey(3)&0xFF))
+     
      /** write a single byte, encrypted, to the output stream.
        * @param b the byte to write.
        */
@@ -55,7 +39,7 @@ class SpritzOutputStream(fname: Option[String],
       * @param len how much to write.
       */
      override def write(b: Array[Byte], off: Int, len: Int) : Unit = {
-        cipher.squeezeXOR(b.view(off,off+len));
+        cipher.squeezeXOR(b,off,len);
         os.write(b,off,len);
      }
 }
@@ -64,78 +48,22 @@ class SpritzOutputStream(fname: Option[String],
   * This class uses SpritzCipher for all the heavy lifting.
   * @author Richard Todd
   */
-class SpritzInputStream(key: String, 
-                        is: java.io.InputStream) 
+class SpritzDecrypter(key: String, 
+                      is: java.io.InputStream) 
    extends java.io.FilterInputStream(is)  {
-
-   private var fname : Option[String] = None
-   def getFname = fname 
-
-  /** Constructs an encrypted stream.
-    * This method reads a 4-byte random initialization
-    * vector, and creates a cipher stream with the IV and
-    * the given key.  It then decrypts 4 bytes, and creates
-    * 32-bit hash of those bytes.  If the next 4 decrypted
-    * bytes match the hash, we assume we have the correct
-    * decryption stream. 
-    * @param key the password to use. It is converted to UTF-8 bytes.
-    * @param in the earlier InputStream in the chain.
-    */
-  private def init : SpritzCipher = {
-     val initial = new Array[Byte](14)
-     if( readFully(initial) != 14 ) {
-         throw new IllegalStateException("Instream wasn't even long enough to contain an encrypted stream!")
-     }
-     if( initial(0) != 1 ) {
-         throw new IllegalStateException("Instream was from wrong version!") 
-     }
-
-     val cipher = SpritzCipher.cipherStream(key, initial.view(1,5))
-     cipher.squeezeXOR(initial.view(5,14))
-     val randBytes = initial.view(5,9)
-     val randHash  = initial.view(9,13)
-     val testHash = SpritzCipher.hash(32,randBytes)
-     if (!testHash.sameElements(randHash)) {
-         throw new IllegalStateException("Bad Password or corrupted file!");
-     } 
-
-     val fnamelen = initial(13)
-     if( fnamelen > 0 ) {
-        var fnameBytes = new Array[Byte](fnamelen)
-        if( readFully(fnameBytes) != fnamelen ) {
-            throw new IllegalStateException("Instream corrupted!")
-        }
-        cipher.squeezeXOR(fnameBytes)
-        fname = Some(new String(fnameBytes,"UTF-8"))
-     }
-
-     cipher
-  }
-
-  private val cipher = init
-
-  private def readFully(buffer : Array[Byte]) : Int = { 
-      var total = buffer.length;
-      var offset = 0;
-
-      while( total > 0 ) {
-         val amount = is.read(buffer, offset, total)
-         if (amount >= 0) {
-           offset += amount
-           total -= amount
-         } else {
-            total = 0
-         }
-      } 
-      offset
-  }
-
+   
+   private val cipher = new SpritzCipher
+   private val header = SpritzHeader.fromStream(is, key)
+   
+   cipher.absorb(header.payloadKey)
+   cipher.skip(2048 + (header.payloadKey(3)&0xFF))
+   
 
   /** Reads a single byte.
     * @return the decrypted byte.
     */
   override def read() : Int  = {
-     is.read() ^ cipher.drip();
+     is.read() ^ cipher.drip()
   }
  
   /** Reads a series of bytes.
@@ -146,7 +74,7 @@ class SpritzInputStream(key: String,
     */
   override def read(b: Array[Byte], off: Int, len: Int) : Int = {
     val amt = is.read(b,off,len);
-    cipher.squeezeXOR(b.view(off,off+amt))
+    cipher.squeezeXOR(b,off,len)
     amt 
   } 
 
@@ -155,8 +83,8 @@ class SpritzInputStream(key: String,
     * @return the actual number skipped (may be less than n)
     */
   override def skip(n : Long) : Long = {
-    val ans = is.skip(n);
-    for( _ <- 1L until ans ) { cipher.drip() }
+    val ans = is.skip(n)
+    cipher.skip(ans)
     ans
   }
 
@@ -174,3 +102,83 @@ class SpritzInputStream(key: String,
 
 }
 
+
+
+/**
+ * This is the main class used to read an encrypted stream. It
+ * understands the header format, the embedded filename, and
+ * the zlib compression.  If you don't want compression, use
+ * a SpritzDecrypter directly.  If you don't even want a header,
+ * get a SpritzCipher.cipherStream().
+ * @author richard
+ */
+class SpritzInputStream(key: String, is: InputStream)
+     extends AutoCloseable {
+
+   import StreamUtils.readFully
+
+   private val decrypter = new SpritzDecrypter(key, is)
+   
+    /**
+     * The original, pre-encryption filename, if it was
+     * stored in the encrypted file.
+     * @return The original filename.
+     */
+    val originalName : Option[String] =  (decrypter.read() & 0xFF) match {
+         case -1 => 
+            throw new IllegalArgumentException("Instream wasn't even long enough to contain an header!")
+	 case 0   =>
+	    None
+	 case len =>  
+            val fnameBytes = new Array[Byte](len)
+            if (readFully(decrypter, fnameBytes) != len) {
+                throw new IllegalStateException("Instream corrupted!")
+            }
+            Some(new String(fnameBytes, UTF_8))
+    }
+
+    /**
+     * Gets an InputStream for decompressed, decrypted data.
+     * @return An InputStream which can be used to read decrypted bytes 
+     */
+    val inputStream : InputStream = new InflaterInputStream(decrypter)
+    
+    override def close() : Unit = {
+        inputStream.close()
+        decrypter.close()
+    }    
+}
+
+ /**
+ * This is the main class used to write an encrypted stream. It
+ * understands the header format, the embedded filename, and
+ * the zlib compression.  If you don't want compression, use
+ * a SpritzEncrypter directly.  If you don't even want a header,
+ * get a SpritzCipher.cipherStream().
+ * @author richard
+ */
+class SpritzOutputStream(val originalName: Option[String],
+                         key: String,
+                         out: OutputStream)
+   extends AutoCloseable {
+
+   private val encrypter = new SpritzEncrypter(originalName, key, out)
+
+   private val nameBytes = originalName.
+                           map(new File(_).getName).
+			   getOrElse("").
+			   getBytes(UTF_8)
+   encrypter.write(nameBytes.length)
+   encrypter.write(nameBytes)
+   
+   val outputStream =
+       new DeflaterOutputStream(encrypter,
+                                new Deflater(Deflater.BEST_COMPRESSION)) 
+
+
+   override def close() : Unit = {
+       outputStream.finish()
+       outputStream.close()
+       encrypter.close()
+   }
+}

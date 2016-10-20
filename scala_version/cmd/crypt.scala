@@ -39,7 +39,7 @@ object Crypt {
        }
        try {
           val insideName = new SpritzInputStream(pw, instream).
-                                       getFname.
+                                       originalName.
                                        getOrElse("(no name)")
           s"$fname: correct password! File inside is $insideName"
        } catch {
@@ -53,7 +53,7 @@ object Crypt {
      val instream = if( fname == "-" ) System.in else new FileInputStream(fname)
      val cipher = new SpritzInputStream(pw, instream)
 
-     val outname = cipher.getFname.getOrElse {
+     val outname = cipher.originalName.getOrElse {
           if(fname.endsWith(".spritz")) fname.dropRight(7)
           else  (fname + ".unenc")
      }
@@ -64,7 +64,7 @@ object Crypt {
                            new FileOutputStream(changeDir(outname,outdir))
                      }
      try {
-          copy(cipher, outstream)
+          copy(cipher.inputStream, outstream)
           s"$fname -decrypt-> $outname"
      } finally {
        instream.close()
@@ -73,32 +73,21 @@ object Crypt {
   }
 
   private def encryptOne(pw: String, odir: Option[String])(fname: String): String = {
-     val outname = changeDir(fname + ".spritz", odir.getOrElse(""))
+     val outname = changeDir(fname + ".dat", odir.getOrElse(""))
      val (instream, outstream, origName) = fname match {
           case "-" => (System.in, System.out, None)
           case _   => (new FileInputStream(fname),
                        new FileOutputStream(outname),
                        Some(fname))
      }
+     val encOut = new SpritzOutputStream(origName, pw, outstream)
      try {
-          copy(instream, new SpritzOutputStream(origName, pw, outstream))
+          copy(instream, encOut.outputStream)
           s"$fname -encrypt-> $outname"
      } finally {
        instream.close()
-       outstream.close()
+       encOut.close()
      }
-  }
-
-  private def getPasswd(times: Int): Option[String] = {
-     val c = System.console()
-     if (c == null) { return None }
-
-     val chrs = c.readPassword("[Password]:")
-     for(_ <- 1 until times) {
-         val rpt = c.readPassword("[Confirm Password]:")
-         if(!rpt.sameElements(chrs)) { throw new Exception("Passwords don't match!") }
-     }
-     Some(new String(chrs))
   }
 
   def cmd(args: List[String]): Unit = {
@@ -124,7 +113,7 @@ object Crypt {
      var flist = parseArgs(args)
 
      if(passwd.length == 0) {
-        passwd = getPasswd(if (decrypt||check) 1 else 2).getOrElse("")
+        passwd = Passwords.getPassword("Password: ", (!decrypt)&&(!check)).getOrElse("")
          
         if (passwd.length == 0) {
            throw new Exception("Password Required!")
