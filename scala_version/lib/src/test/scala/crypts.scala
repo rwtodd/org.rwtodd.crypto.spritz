@@ -59,6 +59,7 @@ class CryptTests {
          val istr = new SpritzInputStream(passwd, inbytes )
          val sz = readFully(istr.inputStream,outbuf)
          assertEquals(s"Content length, test#$idx", contentLength, sz)
+         assertEquals(s"Original name, test#$idx", origname, istr.originalName)
          istr.close()         
          assertArrayEquals(s"Content, test#$idx", 
                            content, 
@@ -88,6 +89,7 @@ class CryptTests {
       var inrdr = new BufferedReader(new InputStreamReader(istr.inputStream, UTF_8))
       
       // now see if the output is good...
+      assertEquals("original name", "tfile.txt", istr.originalName.get)
       assertEquals("1st line", "abc", inrdr.readLine()) 
       assertEquals("2nd line", "abc", inrdr.readLine()) 
       assertEquals("3rd line", "123", inrdr.readLine()) 
