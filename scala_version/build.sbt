@@ -10,7 +10,8 @@ lazy val commonSettings = Seq(
 lazy val lib = (project in file("lib")).
   settings(commonSettings: _*).
   settings(
-    name := "spritz"
+    name := "spritz",
+    libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test"
   )
   
 lazy val cmd = (project in file("cmd")).
