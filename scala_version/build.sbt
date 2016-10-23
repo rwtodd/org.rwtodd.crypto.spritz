@@ -1,4 +1,3 @@
-
 lazy val commonSettings = Seq(
   organization := "com.waywardcode",
   version := "1.0",
@@ -20,12 +19,10 @@ lazy val cmd = (project in file("cmd")).
   ).
   dependsOn(lib)
 
-// lazy val notes = (project in file("notes")).
-//   settings(commonSettings: _*).
-//   settings(
-//     name := "spritz_notes"
-//     libraryDependencies ++= Seq("com.atlassian.commonmark" %%
-//                                 "commonmark" %%
-// 				"0.6.0")
-//   ).
-//   dependsOn(lib)
+lazy val notes = (project in file("encrnotes")).
+  settings(commonSettings: _*).
+  settings(
+    name := "encrnotes",
+    libraryDependencies += ("com.atlassian.commonmark" % "commonmark" % "0.6.0")
+  ).
+  dependsOn(lib)

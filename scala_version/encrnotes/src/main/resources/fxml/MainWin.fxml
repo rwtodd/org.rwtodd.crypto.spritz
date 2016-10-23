@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.*?>
+<?import java.util.*?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.web.HTMLEditor?>
+
+<BorderPane  xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/8"  
+           id="main" fx:controller="rwt.spritz.MainWinController" 
+           prefHeight="600" prefWidth="800" fx:id="root">
+    <top>
+        <VBox>
+        <MenuBar> 
+            <menus>
+            <Menu text="File">
+                <items>
+                    <MenuItem text="Open" onAction="#menuOpen" ></MenuItem>
+                    <MenuItem text="Save" onAction="#menuSave" ></MenuItem>
+                    <MenuItem text="Edit Password" onAction="#menuEditPW"></MenuItem>
+                    <MenuItem text="Render Markdown" onAction="#menuRender">
+                    </MenuItem>
+                    <SeparatorMenuItem />
+                    <MenuItem text="Exit" onAction="#menuExit" ></MenuItem>
+                </items>
+            </Menu>
+            </menus>
+        </MenuBar>
+        <HBox fx:id="passwField" spacing="10" >
+            <padding><Insets left="10" right="10" top="10" bottom="10"  /></padding>
+            <children>
+            <Label text="Password:"></Label>
+            <PasswordField HBox.hgrow="ALWAYS" fx:id="passw"></PasswordField>
+            </children>
+        </HBox> 
+        </VBox>
+    </top>
+    <center>
+        <TextArea  VBox.vgrow="ALWAYS" fx:id="editor">
+            <padding><Insets top="10" left="10" right="10" bottom="10" /></padding>
+        </TextArea>
+    </center>
+    <bottom><Button maxWidth="9999" onAction="#menuRender">Render Markdown</Button></bottom>               
+</BorderPane>
