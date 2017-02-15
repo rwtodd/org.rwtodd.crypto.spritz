@@ -37,6 +37,6 @@ spritz-crypt: spritz.h crypt.c  libspritz.a
 	${CC} ${CCOPT} crypt.c  -L. -lspritz -o spritz-crypt
 	${STRIP} spritz-crypt
 
-spritz-hash: spritz.h hash.c libspritz.a
-	${CC} ${CCOPT} hash.c  -L. -lspritz -o spritz-hash
+spritz-hash: spritz.h hash.c b64.c libspritz.a
+	${CC} ${CCOPT} hash.c b64.c -L. -lspritz -o spritz-hash
 	${STRIP} spritz-hash

@@ -5,7 +5,10 @@ spritz-hash \- compute a hash via the spritz streaming cipher
 
 .SH SYNOPSIS
 .B spritz-hash
-[\fB\-s\fR \fIN\fR] [\fIfile\fR ...]
+.RB [ \-s
+.IR N ]
+.RB [ \-h ]
+.RI [ file \.\.\.]
 
 .SH DESCRIPTION
 spritz-hash computes a cryptographic hash of any
@@ -16,6 +19,9 @@ If no filename is given, or if the filename is '-',
 input is read from \fBstdin\fR.
 
 .SH OPTIONS
+.TP
+.B \-h 
+Display the hash as hex digits instead of base64-encoded.
 .TP
 .BI \-s " N"
 Set the size of the computed hash, in bits. The default is

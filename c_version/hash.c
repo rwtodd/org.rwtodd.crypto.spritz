@@ -1,4 +1,5 @@
 #include "spritz.h"
+#include<stdbool.h>
 #include<stdint.h>
 #include<stdio.h>
 #include<stdlib.h>
@@ -6,20 +7,38 @@
 #include<string.h>
 #include<fcntl.h>
 
-static void usage()
-{
-    fprintf(stderr, "Usage: spritz-hash [-s n] [file1 file2..]\n");
-    fprintf(stderr, "  -h    Display this help message.\n");
-    fprintf(stderr, "  -s n  Set the size of the hash in bits.\n");
-    exit(2);
-}
+
+/* *************************************************************
+ * G L O B A L   F L A G S
+ * *************************************************************
+ */
+
+/* we have the option of base64-encoding the hashed output... see b64.c */
+char *base64_encode(const uint8_t * in, size_t len);
+bool use_b64;  
+
+/* record the hash size in bytes as a program-wide flag */
+size_t hash_size; 
+
+
+/* *************************************************************
+ * U T I L I T Y   F U N C S 
+ * *************************************************************
+ */
 
 /* print_hash: prints a given hash as a series of bytes */
-static inline void print_hash(size_t sz, const uint8_t * const h)
+static void print_hash(const uint8_t * const h)
 {
-    for (size_t i = 0; i < sz; ++i) {
-	printf("%02x", h[i]);
-    }
+    if(use_b64) {
+      char *const encoded = base64_encode(h, hash_size);
+      fputs(encoded, stdout);
+      free(encoded);
+    } else {
+      /* just print hex */
+      for (size_t i = 0; i < hash_size; ++i) {
+  	  printf("%02x", h[i]);
+      }
+   }
 }
 
 /* maybe_open: A wrapper for open().  If the filename isnt "-", open 
@@ -36,8 +55,15 @@ static int maybe_open(const char *const fname, int flags, mode_t mode)
     return reading ? open(fname, flags) : open(fname, flags, mode);
 }
 
+
+/* *************************************************************
+ * M A I N   P R O G R A M   
+ * *************************************************************
+ */
+
+
 /* hash_fname: conpute the hash, size 'sz', of the file 'fname' */
-static int hash_fname(size_t sz, const char *const fname)
+static int hash_fname(const char *const fname)
 {
     int fd = maybe_open(fname, O_RDONLY, 0);
     if (fd < 0) {
@@ -45,7 +71,7 @@ static int hash_fname(size_t sz, const char *const fname)
 	return fd;
     }
 
-    const uint8_t *const hash = spritz_file_hash(fd, sz);
+    const uint8_t *const hash = spritz_file_hash(fd, hash_size);
     close(fd);
 
     if (hash == NULL) {
@@ -54,7 +80,7 @@ static int hash_fname(size_t sz, const char *const fname)
     }
 
     printf("%s: ", fname);
-    print_hash(sz, hash);
+    print_hash(hash);
     putchar('\n');
 
     destroy_spritz_hash(hash);
@@ -65,17 +91,18 @@ int main(int argc, char **argv)
 {
     /* parse cmdline args */
     int c;
-    int sz = 32;
+    hash_size = 32;
+    use_b64 = true; /* assume we'll use base64 by default */
 
     while ((c = getopt(argc, argv, "hs:")) != -1) {
 	switch (c) {
 	case 'h':
-	    usage();
+            use_b64 = false;
 	    break;
 	case 's':
-	    sz = (atoi(optarg) + 7) / 8;
-	    if (sz < 1)
-		sz = 1;
+	    hash_size = (atoi(optarg) + 7) / 8;
+	    if (hash_size < 1)
+		hash_size = 1;
 	    break;
 	}
     }
@@ -83,10 +110,10 @@ int main(int argc, char **argv)
     /* run the hashes */
     int err = 0;		/* track errors */
     if (optind >= argc) {
-	err += hash_fname((size_t) sz, "-");
+	err += hash_fname("-");
     } else {
 	for (int idx = optind; idx < argc; ++idx) {
-	    err += hash_fname((size_t) sz, argv[idx]);
+	    err += hash_fname(argv[idx]);
 	}
     }
     return (err < 0);
