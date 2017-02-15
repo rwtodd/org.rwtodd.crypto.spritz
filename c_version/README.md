@@ -1,6 +1,6 @@
 # C Version
 
-## (2016-02-27) Concurrency Via Perl Script, v2
+## (2016-02-27) Concurrency Via xargs
 
 I decided my previous two versions (creating a server/client model
 via fork/exec) were more complicated than the situation warranted.
@@ -8,23 +8,15 @@ So, while they worked well and will live forever in this repo's history,
 I decided to simplify them.
 
 I've made spritz-crypt and spritz-hash both single-threaded, single-process
-commands, and provided a perl script that can launch multiple copies of
-them and distribute the inputs between them.  Unlike the previous 
-solutions, the perl script doesn't monitor the workers via `poll` and
-feed them on demand.  Instead, it tries to give all the workers about the
-same number of files and hopes for the best.  I think that's
-sufficient for a problem like this one... the previous solutions were
-fun but overkill.  
+commands, and am content to launch multiple copies of them
+via `xargs`.  This example runs 4 hashes concurrently, running each process
+it spawns on five files:
 
-Here's a command to hash an entire directory tree, spreading the work
-across 3 processes:
+    find . -type f | xargs -n 5 -P 4 spritz-hash
 
-    find . -type f | xargs distribute.pl -j3 -p'spritz-hash -s128' 
-
-As you can see, the distribute.pl script is a general tool, that 
-could be useful in many contexts.  I might extend it with a flag that 
-tells it to count the size of the input files, and try to distribute 
-equal size, rather than equal numbers of files.
+It won't be as efficient at load-balancing as the client-server is, 
+but for my use-cases I won't ever care.  This is a better balance
+between features and complexity for my purposes.
 
 ## (2016-02-21) Concurrency Via Perl Script
 
