@@ -19,6 +19,9 @@ CCOPT=-std=c11 -march=native -O3
 clean:
 	-${RM} *.o *.a *~ spritz-hash spritz-crypt
 
+test: all
+	test/test.sh
+
 install: all
 	${MKDIR} -p ${PREFIX}/bin
 	${MV} spritz-hash spritz-crypt ${PREFIX}/bin
