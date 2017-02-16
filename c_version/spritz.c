@@ -62,19 +62,11 @@ static void update(spritz_state s, int times)
     s->k = mk;
 }
 
-static int gcd(const int e1, const int e2)
-{
-    if (e2 == 0)
-	return e1;
-    return gcd(e2, e1 % e2);
-}
 
 static void whip(spritz_state s, const int amt)
 {
     update(s, amt);
-    do {
-	s->w++;
-    } while (gcd(s->w, N) != 1);
+    s->w += 2;
 }
 
 
@@ -118,7 +110,6 @@ void spritz_absorb_many(spritz_state s, const uint8_t * bytes, size_t len)
     }
 }
 
-
 void spritz_absorb_stop(spritz_state s)
 {
     if (s->a == N / 2)
@@ -161,6 +152,19 @@ void spritz_xor_many(spritz_state s, uint8_t * arr, size_t len)
     }
 }
 
+/* absorb_number is a helper function which absorbs the bytes
+ * of a number, one at a time.  Used as part of the hashing
+ * process for large hash sizes.  Note that there is no
+ * practical chance of blowing the stack with this recursive
+ * funcion, as any reasonable hash size is 2 bytes or less.
+ */
+static void absorb_number(spritz_state s, size_t number) {
+   if(number > 255) {
+      absorb_number(s, number >> 8);
+   } 
+   spritz_absorb(s, number);
+}
+
 /* returns a hash which must be destroyed by 
  * destroy_hash. 
  */
@@ -182,7 +186,7 @@ uint8_t *spritz_file_hash(int fd, size_t bytes)
     }
 
     spritz_absorb_stop(s);
-    spritz_absorb(s, bytes);
+    absorb_number(s, bytes);
     spritz_drip_many(s, ans, bytes);
     destroy_spritz(s);
     free(buffer);
@@ -200,7 +204,7 @@ uint8_t *spritz_mem_hash(const uint8_t * const mem,
 
     spritz_absorb_many(s, mem, len);
     spritz_absorb_stop(s);
-    spritz_absorb(s, bytes);
+    absorb_number(s, bytes);
 
     spritz_drip_many(s, ans, bytes);
     destroy_spritz(s);
