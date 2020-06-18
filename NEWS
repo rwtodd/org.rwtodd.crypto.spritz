@@ -1,0 +1,7 @@
+N E W S
+-------
+
+2020-06-17
+
+  Converted project to Autotools/GNU-ish format.  Only the hashing
+  functionality is working at present.  Encryption is still coming.
