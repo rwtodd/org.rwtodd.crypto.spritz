@@ -247,20 +247,6 @@ spritz_mem_hash (const uint8_t * const mem, size_t len, uint8_t * const hash,
   spritz_drip_many (&s, hash, bytes);
 }
 
-/* sets up a spritz state suitable for encrypting/decrypting */
-spritz_state
-spritz_crypt (const uint8_t * pw, size_t pwlen,
-              const uint8_t * iv, size_t ivlen)
-{
-  spritz_state s = create_spritz ();
-
-  spritz_absorb_many (s, pw, pwlen);
-  spritz_absorb_stop (s);
-  spritz_absorb_many (s, iv, ivlen);
-
-  return s;
-}
-
 static ssize_t
 write_fully (int fd, const uint8_t * buf, size_t len)
 {

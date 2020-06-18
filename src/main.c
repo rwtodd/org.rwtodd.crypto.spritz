@@ -3,7 +3,7 @@
 
 /* prototypes for commands */
 int hash_main (int argc, char **argv);  /* hash.c */
-int crypt_main (int argc, char **argv);  /* crypt.c */
+int crypt_main (int argc, char **argv); /* crypt.c */
 
 
 int
