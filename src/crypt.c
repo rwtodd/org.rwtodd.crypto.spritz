@@ -9,7 +9,6 @@
 #include<termios.h>
 
 
-
 /* define the file header (not the literal layout) */
 #define HDR_IV 0
 #define HDR_CHECK_INT 4
@@ -87,6 +86,26 @@ read_fully (int fd, uint8_t * buffer, size_t len)
   return true;
 }
 
+static bool
+fd_xor_copy (spritz_state s, int tgt_fd, int src_fd)
+{
+  ssize_t total = 0;
+
+  uint8_t *const buffer = malloc (4096 * sizeof (uint8_t));
+
+  ssize_t rsz;
+  while ((rsz = read (src_fd, buffer, 4096)) > 0)
+    {
+      spritz_xor_many (s, buffer, rsz);
+      if (!write_fully (tgt_fd, buffer, rsz))
+        break;
+    }
+
+  free (buffer);
+  return (rsz == 0);
+}
+
+
 /* basename: from path 'src', return the basename
  * as a pointer into the same memory as 'src'
  */
@@ -129,6 +148,12 @@ determine_target (bool encrypting, const char *odir, const char *src)
   srclen = strlen (src);
   tgtlen = odirlen + srclen + 7 + 1;
 
+  if (tgtlen >= 256)
+    {
+      fputs ("target filename can't be larger than 256 chars!\n", stderr);
+      return NULL;
+    }
+  
   /* Second, allocate and copy the filename */
   if ((tgt = malloc (tgtlen * sizeof (char))) == NULL)
     {
@@ -301,6 +326,60 @@ done:
 typedef bool (*processor) (const uint8_t * const pw_hash, const char *src,
                            const char *tgt);
 
+/* pull the embedded filename out of the encrypted file, returning
+ * memory that must be freed with free().  Any name found inside is
+ * appended to the directoryname of tgt.  If there is no embedded
+ * filename, then a copy of tgt is returned.
+ *
+ * If the file is being piped, then ignore the embedded name.
+ */
+static char *
+read_embedded_fname(spritz_state ss, int srcfd, const char *tgt)
+{
+  uint8_t one_byte = 0;
+  if(read(srcfd, &one_byte, 1) != 1) {
+    return NULL;
+  }
+  size_t embedded_size = (size_t)(one_byte ^ spritz_drip(ss));
+  
+  /* just allocate the max buffer we are allowing */
+  char *ans = malloc(256);
+  size_t dirsz = (size_t)(basename(tgt) - tgt);
+
+  if((embedded_size + dirsz) >= 256)
+    {
+      fputs("output filename would be too long!", stderr);
+      free(ans);
+      return NULL;
+    }
+
+  if (embedded_size > 0)
+    {
+      memcpy(ans, tgt, dirsz); /* copy the directory in place */
+      if(!read_fully(srcfd, ans+dirsz, embedded_size))
+	{
+	  fputs("could not read from source!", stderr);
+	  free(ans);
+	  return NULL;
+	}
+      spritz_xor_many(ss, ans+dirsz, embedded_size);
+      ans[dirsz+embedded_size] = '\0';  /* null terminate it */
+    }
+  else
+    strcpy(ans, tgt); 
+
+  /* so, if the output was destined for stdout, keep that.  We still
+   * had to do the work above regardless, to move forward the spritz
+   * state.
+   */
+  if(tgt[0] == '-' && tgt[1] == '\0')
+    {
+      ans[0] = '-'; ans[1] = '\0';
+    }
+  
+  return ans;
+}
+
 /* decrypt_file: decrypt 'src' against password 'pw_hash', writing
  * the output to 'tgt'
  */
@@ -310,15 +389,15 @@ decrypt_file (const uint8_t * const pw_hash, const char *src, const char *tgt)
   bool result = false;
   uint8_t header[HDR_LEN];      /* IV, random data, hash of random data */
   int srcfd = -1, tgtfd = -1;
-
-  if ((srcfd = maybe_open (src, O_RDONLY, 0)) < 0 ||
-      (tgtfd = maybe_open (tgt, O_WRONLY | O_CREAT | O_TRUNC, 0666)) < 0)
+  char *embedded_filename = NULL;
+  
+  if ((srcfd = maybe_open (src, O_RDONLY, 0)) < 0)
     {
-      fprintf (stderr, "%s error: Failed to open input or output file!\n",
+      fprintf (stderr, "%s error: Failed to open input file!\n",
                src);
       goto cleanup;
     }
-
+    
   /* read in the header */
   if (!read_fully (srcfd, header, HDR_LEN))
     {
@@ -332,17 +411,31 @@ decrypt_file (const uint8_t * const pw_hash, const char *src, const char *tgt)
       goto cleanup;
     }
 
-  spritz_state ss =
-    generate_skipped_stream (header + HDR_KEY,
-                             (int) (header[HDR_CHECK_INT + 1]));
+  spritz_state ss = generate_skipped_stream (header + HDR_KEY,
+                                             (int) (header
+                                                    [HDR_CHECK_INT + 1]));
   if (ss == NULL)
     {
       fputs ("could not generate spritz state!\n", stderr);
       goto cleanup;
     }
 
-  /* ok, looks like the password was right... now decrypt */
-  if (spritz_xor_copy (ss, tgtfd, srcfd) < 0)
+  /* ok, looks like the password was right... now get any embedded filenames */
+  if ((embedded_filename = read_embedded_fname(ss, srcfd, tgt)) == NULL)
+    {
+      fprintf (stderr, "%s Could not read metadata (corrupted file?)\n", src);
+      goto cleanup;
+    }
+  
+  if ((tgtfd = maybe_open (embedded_filename, O_WRONLY | O_CREAT | O_EXCL, 0666)) < 0)
+    {
+      fprintf (stderr, "%s error: Failed to open  output file!\n",
+               embedded_filename);
+      goto cleanup;
+    }
+
+  /* read in the header */
+  if (fd_xor_copy (ss, tgtfd, srcfd) < 0)
     {
       fprintf (stderr, "%s: Decryption error!\n", src);
       goto cleanup2;
@@ -350,18 +443,82 @@ decrypt_file (const uint8_t * const pw_hash, const char *src, const char *tgt)
 
   result = true;                /* success! */
   if (tgtfd != 1)
-    printf ("%s -decrypt-> %s\n", src, tgt);
+    printf ("%s -decrypt-> %s\n", src, embedded_filename);
 
 cleanup2:
   if (ss != NULL)
     destroy_spritz (ss);
 cleanup:
+  if (embedded_filename != NULL)
+    free(embedded_filename);
   if (tgtfd >= 0)
     close (tgtfd);
   if (srcfd >= 0)
     close (srcfd);
   return result;
 }
+
+/* decrypt_file: decrypt 'src' against password 'pw_hash', writing
+ * the output to 'tgt'
+ */
+static bool
+check_file (const uint8_t * const pw_hash, const char *src, const char *tgt)
+{
+  bool result = false;
+  uint8_t header[HDR_LEN];      /* IV, random data, hash of random data */
+  int srcfd = -1;
+  char *embedded_filename = NULL;
+  
+  if ((srcfd = maybe_open (src, O_RDONLY, 0)) < 0)
+    {
+      fprintf (stderr, "%s error: Failed to open input file!\n",
+               src);
+      goto cleanup;
+    }
+    
+  /* read in the header */
+  if (!read_fully (srcfd, header, HDR_LEN))
+    {
+      fprintf (stderr, "%s Can't read header!\n", src);
+      goto cleanup;
+    }
+
+  if (!decrypt_header (header, pw_hash))
+    {
+      fprintf (stderr, "%s Bad password or corrupted file.\n", src);
+      goto cleanup;
+    }
+
+  spritz_state ss = generate_skipped_stream (header + HDR_KEY,
+                                             (int) (header
+                                                    [HDR_CHECK_INT + 1]));
+  if (ss == NULL)
+    {
+      fputs ("could not generate spritz state!\n", stderr);
+      goto cleanup;
+    }
+
+  /* ok, looks like the password was right... now get any embedded filenames */
+  if ((embedded_filename = read_embedded_fname(ss, srcfd, tgt)) == NULL)
+    {
+      fprintf (stderr, "%s Could not read metadata (corrupted file?)\n", src);
+      goto cleanup;
+    }
+  
+  result = true;                /* success! */
+  printf ("%s -decrypt-> %s\n", src, embedded_filename);
+
+cleanup2:
+  if (ss != NULL)
+    destroy_spritz (ss);
+cleanup:
+  if (embedded_filename != NULL)
+    free(embedded_filename);
+  if (srcfd >= 0)
+    close (srcfd);
+  return result;
+}
+
 
 /*
  * ************************************************************
@@ -378,38 +535,62 @@ encrypt_file (const uint8_t * const pw_hash, const char *src, const char *tgt)
   bool result = false;
   uint8_t header[HDR_LEN];
   int srcfd = -1, tgtfd = -1;
-
+  const char *const base_fn = basename(src);
+  
   /* Fill out and encrypt the header */
   gen_rdata (header, 8);
   spritz_mem_hash (header + HDR_CHECK_INT, 4, header + HDR_HASHCHECK_INT, 4);
   gen_rdata (header + HDR_KEY, KEY_LEN);
-  spritz_state ss =
-    generate_skipped_stream (header + HDR_KEY,
-                             (int) (header[HDR_CHECK_INT + 1]));
+  spritz_state ss = generate_skipped_stream (header + HDR_KEY,
+                                             (int) (header
+                                                    [HDR_CHECK_INT + 1]));
   encrypt_header (header, pw_hash);
 
   if ((srcfd = maybe_open (src, O_RDONLY, 0)) < 0 ||
-      (tgtfd = maybe_open (tgt, O_WRONLY | O_CREAT | O_TRUNC, 0666)) < 0)
+      (tgtfd = maybe_open (tgt, O_WRONLY | O_CREAT | O_EXCL, 0666)) < 0)
     {
       fprintf (stderr, "%s error: Failed to open input or output file!\n",
                src);
       goto cleanup;
     }
 
-  /* now encrypt and write out the file... */
-  if ((!write_fully (tgtfd, header, HDR_LEN)) ||
-      (spritz_xor_copy (ss, tgtfd, srcfd) < 0))
+  /* now write the file out, header, base name, then payload */
+  if (!write_fully (tgtfd, header, HDR_LEN))
     {
       fprintf (stderr, "%s error: Failed to write!\n", tgt);
       goto cleanup;
+    }
+
+  size_t base_len = strlen(base_fn);
+  if( (base_len > 255) || (base_len == 1 && base_fn[0] == '-') )
+    {
+      base_len = 0;
+    }
+  size_t base_buffer_len = base_len + 1;
+  uint8_t * base_buffer = malloc(base_buffer_len);
+  base_buffer[0] = (uint8_t)(base_len & 0xff);
+  memcpy(base_buffer+1, base_fn, base_len);
+  spritz_xor_many(ss, base_buffer, base_buffer_len);  
+  if (!write_fully(tgtfd, base_buffer, base_buffer_len))
+    {
+      fprintf (stderr, "%s error: Failed to write!\n", tgt);
+      goto cleanup2;
+    }
+  
+  if (!fd_xor_copy (ss, tgtfd, srcfd))
+    {
+      fprintf (stderr, "%s error: Failed to write!\n", tgt);
+      goto cleanup2;
     }
 
   /* no errors! */
   result = true;
   if (tgtfd != 1)
     printf ("%s -encrypt-> %s\n", src, tgt);
-
-cleanup:
+  
+ cleanup2:
+  free(base_buffer);
+ cleanup:
   if (ss != NULL)
     destroy_spritz (ss);
   if (tgtfd >= 0)
@@ -546,13 +727,16 @@ crypt_main (int argc, char **argv)
   uint8_t pw_hash[KEY_LEN];     /* the hashed password */
   bool have_pw = false;         /* have we collected a password? */
 
-  while ((c = getopt (argc, argv, "do:p:")) != -1)
+  while ((c = getopt (argc, argv, "dno:p:")) != -1)
     {
       switch (c)
         {
         case 'd':
           proc = &decrypt_file;
           break;
+	case 'n':
+	  proc = &check_file;
+	  break;
         case 'o':
           if (odir != NULL)
             {
@@ -596,7 +780,7 @@ crypt_main (int argc, char **argv)
    * on the terminal
    */
   if (!(have_pw ||
-        collect_password ((proc == &decrypt_file) ? 1 : 2, pw_hash, KEY_LEN)))
+        collect_password ((proc == &encrypt_file) ? 2 : 1, pw_hash, KEY_LEN)))
     return 1;
 
   srand (time (NULL));

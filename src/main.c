@@ -33,7 +33,7 @@ main (int argc, char **argv)
   if (cmd_func == NULL)
     {
       fputs ("Usage: spritz hash [-h] [-s size] [files]\n", stderr);
-      fputs ("       spritz crypt [-d] [-o dir] [-p pwd] [files]\n", stderr);
+      fputs ("       spritz crypt [-d|-n] [-o dir] [-p pwd] [files]\n", stderr);
       return 1;
     }
   return (*cmd_func) (argc, argv);
