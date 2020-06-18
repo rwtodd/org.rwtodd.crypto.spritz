@@ -15,6 +15,17 @@ struct s_spritz_state
   uint8_t mem[N];
 };
 
+static void
+reset_state (spritz_state s)
+{
+  s->i = s->j = s->k = s->z = s->a = 0;
+  s->w = 1;
+  for (int idx = 0; idx < N; ++idx)
+    {
+      s->mem[idx] = idx;
+    }
+}
+
 /* creates memory that should be destroyed by
  * call to destroy_spritz
  */
@@ -24,13 +35,7 @@ create_spritz (void)
   spritz_state ans = malloc (sizeof (struct s_spritz_state));
   if (ans == NULL)
     return NULL;
-
-  ans->i = ans->j = ans->k = ans->z = ans->a = 0;
-  ans->w = 1;
-  for (int idx = 0; idx < N; ++idx)
-    {
-      ans->mem[idx] = idx;
-    }
+  reset_state (ans);
   return ans;
 }
 
@@ -48,7 +53,7 @@ swap (uint8_t * const arr, size_t el1, size_t el2)
   arr[el2] = tmp;
 }
 
-/* when adding indices... need to clip them at 256 */
+/* when adding indices... need them modulus 256 */
 #define smem(x)  s->mem[ (x) & 0xff ]
 
 static void
@@ -111,7 +116,7 @@ absorb_nibble (spritz_state s, uint8_t x)
   s->a++;
 }
 
-void
+inline void
 spritz_absorb (spritz_state s, const uint8_t b)
 {
   absorb_nibble (s, b & 0x0f);
@@ -203,28 +208,24 @@ spritz_file_hash (int fd, uint8_t * hash, size_t size)
   if (buffer == NULL)
     return false;
 
-
-  spritz_state s = create_spritz ();
-  if (s == NULL)
-    return false;
-
+  struct s_spritz_state s;
+  reset_state (&s);
   bool result = false;
 
   ssize_t rsz;
   while ((rsz = read (fd, buffer, 4096)) > 0)
     {
-      spritz_absorb_many (s, buffer, rsz);
+      spritz_absorb_many (&s, buffer, rsz);
     }
 
   if (rsz < 0)
     goto done;
 
-  spritz_absorb_stop (s);
-  absorb_number (s, size);
-  spritz_drip_many (s, hash, size);
+  spritz_absorb_stop (&s);
+  absorb_number (&s, size);
+  spritz_drip_many (&s, hash, size);
   result = true;
 done:
-  destroy_spritz (s);
   free (buffer);
   return result;
 }
@@ -232,21 +233,18 @@ done:
 /* 
  *  fills user-provided memory with hashed bytes.
  */
-bool
+void
 spritz_mem_hash (const uint8_t * const mem, size_t len, uint8_t * const hash,
                  size_t bytes)
 {
-  spritz_state s = create_spritz ();
-  if (s == NULL)
-    return false;
+  struct s_spritz_state s;
+  reset_state (&s);
 
-  spritz_absorb_many (s, mem, len);
-  spritz_absorb_stop (s);
-  absorb_number (s, bytes);
+  spritz_absorb_many (&s, mem, len);
+  spritz_absorb_stop (&s);
+  absorb_number (&s, bytes);
 
-  spritz_drip_many (s, hash, bytes);
-  destroy_spritz (s);
-  return true;
+  spritz_drip_many (&s, hash, bytes);
 }
 
 /* sets up a spritz state suitable for encrypting/decrypting */
