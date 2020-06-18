@@ -8,6 +8,8 @@
 #include<time.h>
 #include<termios.h>
 
+/* we hash the passwords to 32 bytes */
+#define PW_HASH_LEN 32
 
 /* generate bytes of random data */
 static void
@@ -49,7 +51,6 @@ decrypt_file (const uint8_t * const pw_hash, const char *src, const char *tgt)
   uint8_t buf[12];              /* IV, random data, hash of random data */
 
   int srcfd = -1, tgtfd = -1;
-  uint8_t *rhash = NULL;
 
   if ((srcfd = maybe_open (src, O_RDONLY, 0)) < 0 ||
       (tgtfd = maybe_open (tgt, O_WRONLY | O_CREAT | O_TRUNC, 0666)) < 0)
@@ -67,13 +68,10 @@ decrypt_file (const uint8_t * const pw_hash, const char *src, const char *tgt)
     }
 
   /* now decrypt the random data and its hash... */
-  spritz_state ss = spritz_crypt (pw_hash, 32, buf, 4);
+  spritz_state ss = spritz_crypt (pw_hash, PW_HASH_LEN, buf, 4);
   spritz_xor_many (ss, buf + 4, 8);
-  if ((rhash = spritz_mem_hash (buf + 4, 4, 4)) == NULL)
-    {
-      fprintf (stderr, "%s error: Can't hash!\n", src);
-      goto cleanup2;
-    }
+  uint8_t rhash[4];
+  spritz_mem_hash (buf + 4, 4, rhash, 4);
 
   if (memcmp (rhash, buf + 8, 4) != 0)
     {
@@ -97,8 +95,6 @@ cleanup2:
   if (ss != NULL)
     destroy_spritz (ss);
 cleanup:
-  if (rhash != NULL)
-    destroy_spritz_hash (rhash);
   if (tgtfd >= 0)
     close (tgtfd);
   if (srcfd >= 0)
@@ -119,15 +115,9 @@ encrypt_file (const uint8_t * const pw_hash, const char *src, const char *tgt)
 
   gen_rdata (buf, 8);
 
-  uint8_t *rhash = NULL;
-  if ((rhash = spritz_mem_hash (buf + 4, 4, 4)) == NULL)
-    {
-      fprintf (stderr, "%s error: Can't hash!\n", src);
-      goto cleanup;
-    }
-
+  uint8_t rhash[4];
+  spritz_mem_hash (buf + 4, 4, rhash, 4);
   memcpy (buf + 8, rhash, 4);
-  destroy_spritz_hash (rhash);
 
   if ((srcfd = maybe_open (src, O_RDONLY, 0)) < 0 ||
       (tgtfd = maybe_open (tgt, O_WRONLY | O_CREAT | O_TRUNC, 0666)) < 0)
@@ -138,7 +128,7 @@ encrypt_file (const uint8_t * const pw_hash, const char *src, const char *tgt)
     }
 
   /* now encrypt and write out the file... */
-  spritz_state ss = spritz_crypt (pw_hash, 32, buf, 4);
+  spritz_state ss = spritz_crypt (pw_hash, PW_HASH_LEN, buf, 4);
   spritz_xor_many (ss, buf + 4, 8);
   if (write (tgtfd, buf, 12) != 12 || spritz_xor_copy (ss, tgtfd, srcfd) < 0)
     {
@@ -160,17 +150,6 @@ cleanup:
   if (srcfd >= 0)
     close (srcfd);
   return result;
-}
-
-static void
-usage ()
-{
-  fprintf (stderr, "Usage: spritz-crypt [options] [file1 file2...]\n");
-  fprintf (stderr, "  -d      Decrypt the input files.\n");
-  fprintf (stderr, "  -h      Display this help message.\n");
-  fprintf (stderr, "  -o dir  Put the output files in dir.\n");
-  fprintf (stderr, "  -p pwd  Set the password to use.\n");
-  exit (2);
 }
 
 /* basename: from path 'src', return the basename
@@ -254,7 +233,7 @@ determine_target (int encrypting, const char *odir, const char *src)
 }
 
 /* tty_echo turns on or off terminal echo */
-void
+static void
 tty_echo (int echo, FILE * tty_file)
 {
   struct termios tty;
@@ -272,9 +251,12 @@ tty_echo (int echo, FILE * tty_file)
  * directly to the user, asking for a password.
  * This way, it will work even when the program
  * is processing stdin.
+ * 
+ * It takes in the buffer for the hashed passwrord, and
+ * the length of the requested hash.
  */
-uint8_t *
-read_pw_tty (void)
+static bool
+read_pw_tty (const char *prompt, uint8_t *const hashed_pw, size_t hash_len)
 {
   char pwbuff[256];
   uint8_t *pw_hash = NULL;
@@ -286,10 +268,10 @@ read_pw_tty (void)
   if ((tty = fopen ("/dev/tty", "r+")) == NULL)
     {
       fputs ("Couldn't open tty!\n", stderr);
-      return NULL;
+      return false;
     }
 
-  fputs ("Password: ", tty);
+  fputs (prompt, tty);
   fflush (tty);
   tty_echo (0, tty);
 
@@ -306,82 +288,88 @@ read_pw_tty (void)
   if (len <= 1)
     {
       fputs ("Error collecting password!\n", stderr);
-      return NULL;
+      return false;
     }
 
   if (pwbuff[len - 1] == '\n')
     --len;
 
-  return spritz_mem_hash ((uint8_t *) pwbuff, len, 32);
+  spritz_mem_hash ((uint8_t *) pwbuff, len, hashed_pw, hash_len);
+  return true;
 }
 
 /* collect_password will read the password
  * from the tty the specified number of times
- * and make sure they always match.  Realistically,
- * times will only be 1 or 2
+ * and make sure they always match.
+ *
+ * Times will only be 1 or 2
  */
-uint8_t *
-collect_password (int times)
+static bool
+collect_password (int times, uint8_t *pw_hash, size_t hash_size)
 {
-  uint8_t *pw_hash = read_pw_tty ();
-
-  while (pw_hash && --times)
+  if(times == 1)
+    return read_pw_tty ("Password: ", pw_hash, hash_size);
+  
+  /* need to collect the password twice, and compare them */
+  bool result = false;
+  uint8_t *second_hash = malloc(hash_size * sizeof(uint8_t));
+  if (second_hash == NULL)
     {
-      uint8_t *next_hash = read_pw_tty ();
-      int pw_ok = (next_hash != NULL)
-        && (memcmp (next_hash, pw_hash, 32) == 0);
-      destroy_spritz_hash (next_hash);
+      fputs("Could not allocate hash!\n", stderr);
+      goto done;
+    }
+  
+  if (! (read_pw_tty ("Password: ", pw_hash, hash_size) &&
+	 (read_pw_tty ("Re-type password: ", second_hash, hash_size))) )
+    goto done;
 
-      if (!pw_ok)
-        {
-          fputs ("Passwords don't match!\n", stderr);
-          destroy_spritz_hash (pw_hash);
-          return NULL;
-        }
-
+  if (memcmp (pw_hash, second_hash, hash_size) != 0)
+    {
+      fputs ("Passwords don't match!\n", stderr);
+      goto done;
     }
 
-  return pw_hash;
+  result = true;
+ done:
+  free (second_hash);
+  return result;
 }
 
-
 int
-main (int argc, char **argv)
+crypt_main (int argc, char **argv)
 {
   /* parse cmdline args */
   int c;
   size_t len;                   /* for counting strings during argument parsing */
   processor proc = encrypt_file;        /* assume we are encrypting */
   char *odir = NULL;            /* the output directory */
-  uint8_t *pw_hash = NULL;      /* the hashed password */
-
-  while ((c = getopt (argc, argv, "dho:p:")) != -1)
+  uint8_t pw_hash[PW_HASH_LEN]; /* the hashed password */
+  bool have_pw = false;         /* have we collected a password? */
+  
+  while ((c = getopt (argc, argv, "do:p:")) != -1)
     {
       switch (c)
         {
         case 'd':
           proc = decrypt_file;
           break;
-        case 'h':
-          usage ();
-          break;
         case 'o':
           if (odir != NULL)
             {
               fputs ("Multiple -o arguments not allowed!\n", stderr);
-              exit (1);
+              return 1;
             }
           len = strlen (optarg);
           if (len >= 256)
             {
               fputs ("-o argument too long!\n", stderr);
-              exit (1);
+              return 1;
             }
           odir = malloc ((len + 2) * sizeof (char));    /* +2 for '/', '\0' */
           if (odir == NULL)
             {
               fputs ("No memory!\n", stderr);
-              exit (1);
+              return 1;
             }
           strcpy (odir, optarg);
           if (odir[len - 1] != '/')
@@ -392,13 +380,14 @@ main (int argc, char **argv)
             }
           break;
         case 'p':
-          if (pw_hash != NULL)
+          if (have_pw)
             {
               fputs ("Multiple -p arguments not allowed!\n", stderr);
-              exit (1);
+              return 1;
             }
           len = strlen (optarg);
-          pw_hash = spritz_mem_hash ((const uint8_t *) optarg, len, 32);
+          spritz_mem_hash ((const uint8_t *) optarg, len, pw_hash, PW_HASH_LEN);
+	  have_pw = true;
           break;
         }
     }
@@ -406,15 +395,10 @@ main (int argc, char **argv)
   /* if we didn't get a password on the command line, ask for it
    * on the terminal
    */
-  if (pw_hash == NULL)
-    {
-      pw_hash = collect_password ((proc == decrypt_file) ? 1 : 2);
-      if (pw_hash == NULL)
-        {
-          exit (1);
-        }
-    }
-
+  if (! (have_pw ||
+	 collect_password ((proc == decrypt_file) ? 1 : 2, pw_hash, PW_HASH_LEN)))
+    return 1;
+    
   srand (time (NULL));
 
   /* process the files, or stdin */
@@ -441,7 +425,6 @@ main (int argc, char **argv)
     }
 
   /* cleanup, although not necessary since we're exiting */
-  destroy_spritz_hash (pw_hash);
   free (odir);
   return (err < 0);
 }

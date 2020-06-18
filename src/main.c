@@ -3,6 +3,7 @@
 
 /* prototypes for commands */
 int hash_main (int argc, char **argv);  /* hash.c */
+int crypt_main (int argc, char **argv);  /* crypt.c */
 
 
 int
@@ -24,12 +25,15 @@ main (int argc, char **argv)
 
   if (!strcmp (cmd, "hash"))
     cmd_func = &hash_main;
+  else if (!strcmp (cmd, "crypt"))
+    cmd_func = &crypt_main;
   /* more commands go here */
 
   /* print usage if we didn't find a command to run */
   if (cmd_func == NULL)
     {
       fputs ("Usage: spritz hash [-h] [-s size] [files]\n", stderr);
+      fputs ("       spritz crypt [-d] [-o dir] [-p pwd] [files]\n", stderr);
       return 1;
     }
   return (*cmd_func) (argc, argv);
