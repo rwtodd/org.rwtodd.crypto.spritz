@@ -97,7 +97,7 @@ hash_fname (const char *const fname)
 }
 
 int
-main (int argc, char **argv)
+hash_main (int argc, char **argv)
 {
   /* parse cmdline args */
   int c;
