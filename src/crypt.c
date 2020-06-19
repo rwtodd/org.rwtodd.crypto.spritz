@@ -9,7 +9,7 @@
 #include<termios.h>
 
 
-/* define the file header (not the literal layout) */
+/* define the file header offsets */
 #define HDR_IV 0
 #define HDR_CHECK_INT 4
 #define HDR_HASHCHECK_INT 8
@@ -506,7 +506,7 @@ check_file (const uint8_t * const pw_hash, const char *src, const char *tgt)
     }
   
   result = true;                /* success! */
-  printf ("%s -decrypt-> %s\n", src, embedded_filename);
+  printf ("%s -success-> %s\n", src, embedded_filename);
 
 cleanup2:
   if (ss != NULL)
@@ -519,6 +519,58 @@ cleanup:
   return result;
 }
 
+/* decrypt_file: decrypt 'src' against password 'pw_hash', writing
+ * the output to 'tgt'
+ */
+static bool
+rekey (const char *src, const uint8_t * const pw_hash, const uint8_t * const npw_hash)
+{
+  bool result = false;
+  uint8_t header[HDR_LEN];      /* IV, random data, hash of random data */
+  int srcfd = -1;
+  
+  if ((srcfd = open(src, O_RDWR)) < 0)
+    {
+      fprintf (stderr, "%s error: Failed to open input file!\n",
+               src);
+      goto cleanup;
+    }
+    
+  /* read in the header */
+  if (!read_fully (srcfd, header, HDR_LEN))
+    {
+      fprintf (stderr, "%s Can't read header!\n", src);
+      goto cleanup;
+    }
+
+  if (!decrypt_header (header, pw_hash))
+    {
+      fprintf (stderr, "%s Bad password or corrupted file.\n", src);
+      goto cleanup;
+    }
+
+  /* now select a new IV and re-encrypt the header with the new password */
+  gen_rdata(header, 4);
+  encrypt_header(header, npw_hash);
+
+  lseek(srcfd, 0, SEEK_SET);
+  if (!write_fully (srcfd, header, HDR_LEN))
+    {
+      fprintf (stderr,
+	       "%s could not write new key. Really sorry about that, "
+	       "since your file may be corrupted now.\n",
+	       src);
+      goto cleanup;
+    }
+    
+  result = true;                /* success! */
+  printf ("%s rekeyed.\n", src);
+
+cleanup:
+  if (srcfd >= 0)
+    close (srcfd);
+  return result;
+}
 
 /*
  * ************************************************************
@@ -712,7 +764,7 @@ done:
 
 /*
  * ************************************************************
- * The main program Section
+ * The CRYPT main program Section
  * ************************************************************
  */
 
@@ -810,5 +862,84 @@ crypt_main (int argc, char **argv)
 
   /* cleanup, although not necessary since we're exiting */
   free (odir);
+  return (err > 0);
+}
+
+/*
+ * ************************************************************
+ * The REKEY main program Section
+ * ************************************************************
+ */
+
+int
+rekey_main (int argc, char **argv)
+{
+  /* parse cmdline args */
+  int c;
+  size_t len;                   /* for counting strings during argument parsing */
+  uint8_t pw_hash[KEY_LEN];     /* the hashed password */
+  bool have_pw = false;         /* have we collected a password? */
+  uint8_t npw_hash[KEY_LEN];    /* the new password, hashed */
+  bool have_npw = false;        /* have we collected the new password? */
+  
+  while ((c = getopt (argc, argv, "o:n:")) != -1)
+    {
+      switch (c)
+        {
+	case 'o':
+          if (have_pw)
+            {
+              fputs ("Multiple -o arguments not allowed!\n", stderr);
+              return 1;
+            }
+          len = strlen (optarg);
+          spritz_mem_hash ((const uint8_t *) optarg, len, pw_hash, KEY_LEN);
+          have_pw = true;
+          break;
+	  
+	case 'n':
+          if (have_npw)
+            {
+              fputs ("Multiple -n arguments not allowed!\n", stderr);
+              return 1;
+            }
+          len = strlen (optarg);
+          spritz_mem_hash ((const uint8_t *) optarg, len, npw_hash, KEY_LEN);
+          have_npw = true;
+          break;
+        }
+    }
+
+  /* error out if there is nothing to process */
+  if ((optind >= argc) ||
+      ((argc - optind == 1) && (!strcmp (argv[optind], "-"))))
+    {
+      fputs("Can't rekey stdin (you have to give files on the cmdline!\n", stderr);
+      return 1;
+    }
+
+  /* if we didn't get a password on the command line, ask for it
+   * on the terminal
+   */
+  if(!have_pw)
+    {
+      fputs("Provide the old password.\n", stderr);
+      if (!collect_password (1, pw_hash, KEY_LEN))
+	return 1;
+    }
+  if(!have_npw)
+    {
+      fputs("Provide the new password.\n", stderr);
+      if (!collect_password (2, npw_hash, KEY_LEN))
+	return 1;
+    }
+
+  srand (time (NULL));
+
+  /* process the files */
+  int err = 0;
+  for (int idx = optind; idx < argc; ++idx)
+      err += (rekey(argv[idx], pw_hash, npw_hash) ? 0 : 1);
+
   return (err > 0);
 }
