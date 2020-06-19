@@ -1,0 +1,124 @@
+.TH spritz "1" "19 February 2020" "" "Utility"
+
+.SH NAME
+spritz \- compute hashes and encrypt via the spritz streaming cipher
+
+.SH SYNOPSIS
+.BI spritz " hash"
+[\fB\-h\fR] [\fB\-s\fR \fIsize\fR] [\fIfile\fR ...]
+.PP
+.BI spritz " crypt"
+[\fB\-d\fR] [\fB\-p\fR \fIpwd\fR] [\fIfile\fR]
+.PP
+.BI spritz " crypt"
+[\fB\-n\fR] [\fB\-p\fR \fIpwd\fR] [\fIfile\fR ...]
+.PP
+.BI spritz " rekey"
+[\fB\-o\fR \fIoldpass\fR] [\fB\-n\fR \fInewpass\fR] \fIfile\fR [\fIfile\fR...]
+
+.SH DESCRIPTION
+spritz uses the spritz stream cipher for hashing and encrypting files.
+Hashes can be of any size, and presented either in hex or base64.  In most
+cases, if a file is not given on the command-line, then \fBstdin\fR is
+used instead.
+.PP
+Files are always encrypted or decrypted to \fBstdout\fR.  Redirect the output
+as needed.
+.PP
+It is decidedly less safe to put passwords in command-line arguments, though
+sometimes the convenience outweighs the reduction in security.  When passwords
+are not given on the commandline, they are read from the TTY, and not echoed to
+the screen.
+.PP
+The encryption is arranged such that a password can be changed on an already-encrypted
+file in-place, without re-encrypting it.  This is very convenient for large files, but
+there is a slight danger when you do this:  If the write fails for some reason, the file
+may be corrupted.  Failing to re-write a small file header should be extremely rare, but
+if you have any concerns, either copy the file first or pipe a decryption into an encryption
+to re-encrypt the whole thing.
+.SH OPTIONS (HASH)
+.TP
+.B \-h 
+Display the hash as hex digits instead of base64-encoded.
+.TP
+.BI \-s " size"
+Set the size of the computed hash, in bits. The default is
+256 bits. 
+
+.SH OPTIONS (CRYPT)
+.TP
+.B \-d
+Decrypt the input to stdout. The default is to encrypt.
+.TP
+.B \-n
+Like \fB-d\fR, only do not actually decrypt.  Just check the password and tell the
+user if the password is correct.  Can be used with multiple files at once.
+.TP
+.BI \-p " pwd"
+Set the password for encryption/decryption to \fIpwd\fR. 
+
+.SH OPTIONS (REKEY)
+.TP
+.BI \-o " oldpass"
+Set the existing password to \fIoldpass\fR. 
+.TP
+.BI \-n " newpass"
+Set the new password to \fIoldpass\fR. 
+
+.SH EXAMPLES
+Print the hashes of all the c files:
+.PP
+.nf
+.RS
+spritz hash *.c
+.RE
+.fi
+.PP
+Now use 32-bit hashes and print in hex:
+.PP
+.nf
+.RS
+spritz hash -hs 32 *.c
+.RE
+.fi
+.PP
+Encrypt all C files into an encrypted package:
+.PP
+.nf
+.RS
+tar cf - *.c | spritz crypt > out.tar.spritz 
+.RE
+.fi
+.PP
+Now, decrypt them:
+.PP
+.nf
+.RS
+spritz crypt -d out.tar.spritz | tar xf -
+.RE
+.fi
+.PP
+Check that you know the password, but don't decrypt:
+.PP
+.nf
+.RS
+spritz crypt -n out.tar.spritz
+.RE
+.fi
+.PP
+Change the password on the encrypted file, without re-encrypting:
+.PP
+.nf
+.RS
+spritz rekey out.tar.spritz
+.RE
+.fi
+.SH BUGS
+None that I know of.
+
+.SH SEE ALSO
+The paper defining the cipher is: 
+http://people.csail.mit.edu/rivest/pubs/RS14.pdf.
+
+.SH AUTHOR
+Richard Todd (richard@rwtodd.org)

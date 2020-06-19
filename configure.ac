@@ -32,7 +32,7 @@ if test "x$ac_cv_func_malloc_0_nonnull" != "xyes" ; then
    AC_MSG_ERROR([Must have a working malloc!])
 fi
 
-AC_CHECK_FUNCS([memset strrchr],
+AC_CHECK_FUNCS([memset],
                [],
 	       AC_MSG_ERROR([Missing required stdlib function!]))
 
