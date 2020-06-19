@@ -29,14 +29,19 @@ static struct s_spritz_state *random_source;
 static bool
 seed_rand (void)
 {
-  uint8_t noise[32];
+  /* 
+   * it's possible/likely that dev/urandom doesn't have
+   * KEY_LEN bytes of randomness, but we won't do better
+   * elsewhere, and maybe one day it might, so...
+   */
+  uint8_t noise[KEY_LEN];
   int urand = open ("/dev/urandom", O_RDONLY);
   if (urand < 0)
     {
       perror ("open urandom");
       return false;
     }
-  if (read (urand, noise, 32) != 32)
+  if (read (urand, noise, KEY_LEN) != KEY_LEN)
     {
       fputs ("failed to read urandom!", stderr);
       return false;
@@ -48,8 +53,9 @@ seed_rand (void)
       fputs ("could not create random source!", stderr);
       return false;
     }
-  spritz_absorb_many (random_source, noise, 32);
+  spritz_absorb_many (random_source, noise, KEY_LEN);
   spritz_absorb_stop (random_source);
+  /* add the low byte of the UNIX time stamp for laughs */
   spritz_absorb (random_source, (uint8_t) (time (NULL) & 0xff));
   return true;
 }

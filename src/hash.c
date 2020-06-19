@@ -47,23 +47,6 @@ print_hash (const uint8_t * const h)
     }
 }
 
-/* maybe_open: A wrapper for open().  If the filename isnt "-", open 
- * filename. Otherwise, return 0 (stdin) of 1 (stdout) based on the 
- * 'flags`.
- */
-static int
-maybe_open (const char *const fname, int flags, mode_t mode)
-{
-  int reading = (flags == O_RDONLY);
-  if (!strcmp (fname, "-"))
-    {
-      return reading ? 0 : 1;   /* stdin:stdout */
-    }
-
-  return reading ? open (fname, flags) : open (fname, flags, mode);
-}
-
-
 /* *************************************************************
  * M A I N   P R O G R A M   
  * *************************************************************
@@ -75,7 +58,8 @@ static bool
 hash_fname (const char *const fname)
 {
   bool result = false;
-  int fd = maybe_open (fname, O_RDONLY, 0);
+  bool is_stdin = !strcmp(fname,"-");
+  int fd = is_stdin ? STDIN_FILENO : open(fname, O_RDONLY);
   if (fd < 0)
     {
       fprintf (stderr, "ERROR Could not open <%s>\n", fname);
@@ -84,9 +68,11 @@ hash_fname (const char *const fname)
 
   if (spritz_file_hash (fd, hash, hash_size))
     {
-      printf ("%s: ", fname);
       print_hash (hash);
-      putchar ('\n');
+      if (is_stdin)
+	putchar ('\n');
+      else
+	printf ("  %s\n", fname);
       result = true;
     }
   else
