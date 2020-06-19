@@ -34,9 +34,11 @@ main (int argc, char **argv)
   /* print usage if we didn't find a command to run */
   if (cmd_func == NULL)
     {
-      fputs ("Usage: spritz hash [-h] [-s size] [files]\n", stderr);
-      fputs ("       spritz crypt [-d|-n] [-o dir] [-p pwd] [files]\n", stderr);
-      fputs ("       spritz rekey [-o oldpwd] [-n newpwd] file1 file2 ...\n\n", stderr);
+      fputs ("Usage: spritz hash [-h] [-s size] [file1 file2 ...]\n"
+             "       spritz crypt [-d] [-p pwd] [file]\n"
+             "       spritz crypt -n [-p pwd] [fil1 file2 ...]\n"
+             "       spritz rekey [-o oldpwd] [-n newpwd] file1 file2 ...\n\n",
+             stderr);
       return 1;
     }
   return (*cmd_func) (argc, argv);

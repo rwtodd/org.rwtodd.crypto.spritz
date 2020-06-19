@@ -195,7 +195,7 @@ absorb_number (spritz_state s, size_t number)
     {
       absorb_number (s, number >> 8);
     }
-  spritz_absorb (s, number);
+  spritz_absorb (s, (uint8_t) (number & 0xff));
 }
 
 /*
