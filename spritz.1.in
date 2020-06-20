@@ -1,4 +1,4 @@
-.TH spritz "1" "19 February 2020" "" "Utility"
+.TH spritz "1" "19 February 2020" "@PACKAGE_STRING@" "Utility"
 
 .SH NAME
 spritz \- compute hashes and encrypt via the spritz streaming cipher

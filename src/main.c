@@ -1,3 +1,4 @@
+#include "config.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -16,11 +17,11 @@ main (int argc, char **argv)
 
   if (argc >= 2)
     {
-      /* peel off the command, and shift up the rest of the args */
+      /* remove the command from the argument list */
       cmd = argv[1];
-      for (int i = 2; i < argc; ++i)
-        argv[i - 1] = argv[i];
+      argv[1] = argv[0];
       --argc;
+      ++argv;
     }
 
   if (!strcmp (cmd, "hash"))
@@ -34,7 +35,8 @@ main (int argc, char **argv)
   /* print usage if we didn't find a command to run */
   if (cmd_func == NULL)
     {
-      fputs ("Usage: spritz hash [-h] [-s size] [file1 file2 ...]\n"
+      fputs (PACKAGE_STRING "\n", stderr);
+      fputs ("Usage: spritz hash  [-h] [-s size] [file1 file2 ...]\n"
              "       spritz crypt [-d] [-p pwd] [file]\n"
              "       spritz crypt -n [-p pwd] [file1 file2 ...]\n"
              "       spritz rekey [-o oldpwd] [-n newpwd] file1 file2 ...\n\n",

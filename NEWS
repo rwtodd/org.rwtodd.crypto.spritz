@@ -1,10 +1,15 @@
 N E W S
 -------
 
+2020-06-20
+
+  Version 1.1 Put the program version in the usage string.  Also
+  improved argument handling efficiency.
+  
 2020-06-19
 
-  Put encryption and rekey functions into the program.  Added a 
-  man page with example usage.
+  Version 1.0 Put encryption and rekey functions into the program.
+  Added a man page with example usage.
 
 2020-06-17
 

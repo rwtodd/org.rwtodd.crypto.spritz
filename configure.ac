@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([spritz], [1.0], [https://github.com/rwtodd/spritz_cipher])
+AC_INIT([spritz], [1.1], [https://github.com/rwtodd/spritz_cipher])
 AC_CONFIG_SRCDIR([src/b64.c])
 AC_CONFIG_HEADERS([src/config.h])
 
@@ -36,5 +36,9 @@ AC_CHECK_FUNCS([memset],
                [],
 	       AC_MSG_ERROR([Missing required stdlib function!]))
 
-AC_CONFIG_FILES([Makefile])
+# we need /dev/urandom to exist...
+AC_CHECK_FILE([/dev/urandom],[],
+   AC_MSG_ERROR([This program requires /dev/urandom to exist on your system.]))
+
+AC_CONFIG_FILES([Makefile spritz.1])
 AC_OUTPUT
