@@ -204,7 +204,7 @@ absorb_number (spritz_state s, size_t number)
 bool
 spritz_file_hash (int fd, uint8_t * hash, size_t size)
 {
-  uint8_t *const buffer = malloc (4096 * sizeof (uint8_t));
+  uint8_t *const buffer = malloc (BUFSIZ * sizeof (uint8_t));
   if (buffer == NULL)
     return false;
 
@@ -213,7 +213,7 @@ spritz_file_hash (int fd, uint8_t * hash, size_t size)
   bool result = false;
 
   ssize_t rsz;
-  while ((rsz = read (fd, buffer, 4096)) > 0)
+  while ((rsz = read (fd, buffer, BUFSIZ)) > 0)
     {
       spritz_absorb_many (&s, buffer, rsz);
     }

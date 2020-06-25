@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([spritz], [1.1], [https://github.com/rwtodd/spritz_cipher])
+AC_INIT([spritz], [1.2], [https://github.com/rwtodd/spritz_cipher])
 AC_CONFIG_SRCDIR([src/b64.c])
 AC_CONFIG_HEADERS([src/config.h])
 

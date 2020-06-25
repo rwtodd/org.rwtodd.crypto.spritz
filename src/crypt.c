@@ -130,10 +130,10 @@ fd_xor_copy (spritz_state s, int tgt_fd, int src_fd)
 {
   ssize_t total = 0;
 
-  uint8_t *const buffer = malloc (4096 * sizeof (uint8_t));
+  uint8_t *const buffer = malloc (BUFSIZ * sizeof (uint8_t));
 
   ssize_t rsz;
-  while ((rsz = read (src_fd, buffer, 4096)) > 0)
+  while ((rsz = read (src_fd, buffer, BUFSIZ)) > 0)
     {
       spritz_xor_many (s, buffer, rsz);
       if (!write_fully (tgt_fd, buffer, rsz))
