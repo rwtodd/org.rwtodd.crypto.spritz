@@ -8,6 +8,8 @@ plugins {
     signing
 }
 
+apply(from = rootProject.file("buildSrc/shared.gradle.kts"))
+
 base {
   archivesName = "org.rwtodd.crypto.spritz"
 }

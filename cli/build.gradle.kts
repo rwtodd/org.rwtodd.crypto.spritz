@@ -3,6 +3,8 @@ plugins {
     application
 }
 
+apply(from = rootProject.file("buildSrc/shared.gradle.kts"))
+
 sourceSets {
     main { 
         java { setSrcDirs(listOf("src")) }
@@ -24,4 +26,3 @@ application {
     mainModule = "spritzcli"
     mainClass = "rwt.Cmd"
 }
-
